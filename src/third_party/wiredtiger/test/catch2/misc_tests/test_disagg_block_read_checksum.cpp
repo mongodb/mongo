@@ -211,7 +211,8 @@ struct read_checksum_fixture {
     static constexpr uint64_t LSN = 100;
     static constexpr uint64_t BASE_LSN = 50;
 
-    read_checksum_fixture() : conn_wrapper("WT_TEST.block_disagg_read_checksum", "create")
+    read_checksum_fixture()
+        : conn_wrapper("WT_TEST.block_disagg_read_checksum", "create,statistics=(all)")
     {
         memset(results, 0, sizeof(results));
 
@@ -488,5 +489,92 @@ TEST_CASE_METHOD(
 
         REQUIRE(read_multiple(blocks[0].checksum) == WT_ERROR);
         CHECK(corruption_flagged());
+    }
+}
+
+/*
+ * The byte-read statistics describe what the read actually returned. The address cookie records the
+ * cumulative size of the chain as written, which matches the sum of the returned blocks for an
+ * ordinary read, but a page rewritten offline is served as a compressed image whose size is
+ * unrelated to the cookie, so the statistic must follow the returned image rather than the cookie.
+ */
+TEST_CASE_METHOD(read_checksum_fixture, "disagg block read: byte-read statistics", "[block_disagg]")
+{
+    auto block_byte_read = [&]() { return (WT_STAT_CONN_READ(conn->stats, block_byte_read)); };
+    auto hs_byte_read = [&]() {
+        return (WT_STAT_CONN_READ(conn->stats, disagg_block_hs_byte_read));
+    };
+
+    /*
+     * A non-cache read is asserted to return exactly the cookie size, so this pins the accounting
+     * to that sum but cannot tell the sum apart from the cookie value;
+     */
+    SECTION("a delta chain counts the base image plus every delta")
+    {
+        uint32_t cookie_checksum = build_chain(blocks, 3, WT_BLOCK_DISAGG_DATA_CKSUM);
+
+        int64_t before = block_byte_read();
+        REQUIRE(read_multiple(cookie_checksum) == 0);
+        CHECK(block_byte_read() - before == static_cast<int64_t>(cumulative_size()));
+    }
+
+    SECTION("an offline-modified page counts the returned image, not the cookie size")
+    {
+        const uint32_t original_checksum = 0xabcd1234;
+        blocks = {make_offline_modified_page(original_checksum)};
+        page_log.delta_count = 2;
+
+        int64_t before = block_byte_read();
+        /* The cookie size is unrelated to the image the read hands back. */
+        REQUIRE(read_multiple(original_checksum, 4096) == 0);
+        CHECK(block_byte_read() - before == static_cast<int64_t>(blocks[0].size()));
+        CHECK(blocks[0].size() != 4096);
+    }
+
+    /*
+     * The statistic follows the returned image in both directions, so an implementation that clamps
+     * to the smaller of the cookie and the returned size cannot pass.
+     */
+    SECTION("a cookie smaller than the returned image does not cap the count")
+    {
+        const uint32_t original_checksum = 0xabcd1234;
+        blocks = {make_offline_modified_page(original_checksum)};
+        page_log.delta_count = 2;
+
+        int64_t before = block_byte_read();
+        REQUIRE(read_multiple(original_checksum, 128) == 0);
+        REQUIRE(blocks[0].size() > 128);
+        CHECK(block_byte_read() - before == static_cast<int64_t>(blocks[0].size()));
+    }
+
+    /* A shared history store read uses the same accounting as an ordinary read. */
+    SECTION("a shared history store read counts the returned image too")
+    {
+        const uint32_t original_checksum = 0xabcd1234;
+        blocks = {make_offline_modified_page(original_checksum)};
+        page_log.delta_count = 2;
+        F_SET(&block_disagg, WT_BLOCK_DISAGG_HS);
+
+        int64_t before = block_byte_read();
+        int64_t hs_before = hs_byte_read();
+        REQUIRE(read_multiple(original_checksum, 4096) == 0);
+        CHECK(block_byte_read() - before == static_cast<int64_t>(blocks[0].size()));
+        CHECK(hs_byte_read() - hs_before == static_cast<int64_t>(blocks[0].size()));
+    }
+
+    /*
+     * A failed read has nothing to account for: the base page is corrupt, so the chain fails after
+     * the deltas have already been walked, and neither byte statistic moves.
+     */
+    SECTION("a failed read counts no bytes")
+    {
+        uint32_t cookie_checksum = build_chain(blocks, 3, WT_BLOCK_DISAGG_DATA_CKSUM);
+        blocks[0].corrupt_body(300);
+
+        int64_t before = block_byte_read();
+        int64_t hs_before = hs_byte_read();
+        REQUIRE(read_multiple(cookie_checksum) == WT_ERROR);
+        CHECK(block_byte_read() == before);
+        CHECK(hs_byte_read() == hs_before);
     }
 }

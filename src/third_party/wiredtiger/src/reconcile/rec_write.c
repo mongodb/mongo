@@ -2644,7 +2644,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     WT_MULTI *multi;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META *block_meta;
-    size_t addr_size, compressed_size;
+    size_t addr_size, compressed_size, delta_base_size;
     uint8_t addr[WT_ADDR_MAX_COOKIE];
     bool build_delta, delta_enabled, skip_write;
 #ifdef HAVE_DIAGNOSTIC
@@ -2841,19 +2841,33 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
                 if (block_meta->delta_count < conn->page_delta.max_consecutive_delta) {
                     WT_RET(__rec_build_delta(session, r, chunk->image.mem, &build_delta));
                     /*
-                     * Discard the delta if it is larger than the configured percentage of the size
-                     * of the full image.
+                     * Discard the delta if it is larger than the configured percentage of the full
+                     * image. Optionally measure against the configured maximum page size instead,
+                     * so a page left partially filled by a split or deletes gets the same delta
+                     * byte budget as a full one. Measuring against the maximum can admit a delta
+                     * approaching the image on a page well under the maximum, which saves little
+                     * over the full page and still costs a read to apply; in that mode bound the
+                     * delta at half the image plus half of delta_pct, a limit that reaches the
+                     * whole image, and so stops applying, at a delta_pct of 100.
                      */
                     if (build_delta) {
                         WT_PAGE_HEADER *header = (WT_PAGE_HEADER *)r->delta.data;
                         WT_ASSERT_ALWAYS(session,
                           header->u.entries > 0 || WT_PAGE_IS_INTERNAL(page),
                           "build empty leaf page delta");
+                        delta_base_size = chunk->image.size;
+                        if (F_ISSET(&conn->page_delta, WT_DELTA_PCT_OF_TARGET_PAGE_SIZE))
+                            delta_base_size = WT_MAX(delta_base_size, r->page_size);
                         if (header->u.entries == 0) {
                             WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_zero_entries);
                             skip_write = true;
-                        } else if (r->delta.size * 100 / chunk->image.size >
+                        } else if (r->delta.size * 100 / delta_base_size >
                           conn->page_delta.delta_pct) {
+                            WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_size_threshold);
+                            build_delta = false;
+                        } else if (F_ISSET(&conn->page_delta, WT_DELTA_PCT_OF_TARGET_PAGE_SIZE) &&
+                          r->delta.size * 100 / chunk->image.size >
+                            (100 + conn->page_delta.delta_pct) / 2) {
                             WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_size_threshold);
                             build_delta = false;
                         }

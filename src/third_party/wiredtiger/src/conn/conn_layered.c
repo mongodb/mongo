@@ -2612,6 +2612,10 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
         if (cval.len > 0 && cval.val >= 0)
             conn->page_delta.delta_pct = (uint32_t)cval.val;
 
+        WT_ERR(__wt_config_gets(session, cfg, "page_delta.delta_pct_of_target_page_size", &cval));
+        if (cval.val)
+            F_SET(&conn->page_delta, WT_DELTA_PCT_OF_TARGET_PAGE_SIZE);
+
         /* Get the threshold fraction of keys removed from the disk image to force a full page. */
         WT_ERR(__wt_config_gets(session, cfg, "page_delta.delete_pct", &cval));
         if (cval.len > 0 && cval.val >= 0)

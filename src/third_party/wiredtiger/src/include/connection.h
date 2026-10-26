@@ -267,8 +267,9 @@ struct __wt_page_delta_config {
     u_int delete_pct;            /* Max delete fraction (%) before forcing full page */
     u_int max_consecutive_delta; /* Max number of consecutive deltas */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_INTERNAL_PAGE_DELTA 0x1u
-#define WT_LEAF_PAGE_DELTA 0x2u
+#define WT_DELTA_PCT_OF_TARGET_PAGE_SIZE 0x1u
+#define WT_INTERNAL_PAGE_DELTA 0x2u
+#define WT_LEAF_PAGE_DELTA 0x4u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
