@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/histogram_server_status_metric.h"
@@ -28,13 +29,16 @@
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <charconv>
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -51,6 +55,14 @@ namespace {
  */
 constexpr char kIdSeparator = '_';
 static_assert(kIdSeparator > '9');
+constexpr char kIdSeparatorSuccessor = '`';
+// We use kIdSeparatorSuccessor to determine the upper bound of a page range in the persistent
+// sample ID. It must be strictly greater than kIdSeparator to ensure correct ordering. Example:
+// When searching for all pages of a sample with a given prefix ABC, the separator (_) is appended
+// to form the lower bound (ABC_).
+// The upper bound is formed by appending the separator and then replacing it by its successor
+// (kIdSeparatorSuccessor), ensuring that all pages with the prefix ABC are included in the range.
+static_assert(kIdSeparatorSuccessor == kIdSeparator + 1);
 
 /**
  * Number of bytes taken up by the `numDocsDiscarded` field in the PersistentSampleDoc type.
@@ -103,9 +115,14 @@ std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
     return prefix;
 }
 
+bool isCanonicalDecimal(std::string_view digits) {
+    return !digits.empty() && std::all_of(digits.begin(), digits.end(), ctype::isDigit) &&
+        (digits.size() == 1 || digits.front() != '0');
+}
+
 /**
  * Scans the persistent samples collection for every page of the sample within the
- * provided range (inclusive)
+ * provided range [minId, maxId)
  */
 StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opCtx,
                                                            const NamespaceString& samplesNss,
@@ -142,7 +159,9 @@ StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opC
             /*resumeAfterRecordId=*/boost::none,
             recordIdForId(minId),
             recordIdForId(maxId),
-            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
+            // Upper bound not included since it is formed using kIdSeparatorSuccessor and should
+            // not be part of the range.
+            CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
 
         BSONObj pageDoc;
         while (exec->getNext(&pageDoc, nullptr) == PlanExecutor::ADVANCED) {
@@ -154,13 +173,41 @@ StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opC
     return pages;
 }
 
+Status checkSingleGeneration(const std::vector<BSONObj>& pages,
+                             const UUID& collectionUuid,
+                             SamplingTechniqueEnum method,
+                             size_t requestedSampleSize,
+                             boost::optional<int> numChunks) {
+    boost::optional<uint64_t> sampleGenId;
+    for (const BSONObj& page : pages) {
+        const BSONElement idElem = page[PersistentSampleDoc::k_idFieldName];
+        if (idElem.type() != BSONType::string) {
+            return Status(ErrorCodes::UnsupportedFormat, "persistent sample _id is not a string");
+        }
+        auto genId = parsePersistentSampleGenId(
+            idElem.valueStringData(), collectionUuid, method, requestedSampleSize, numChunks);
+        if (!genId.isOK()) {
+            return genId.getStatus();
+        }
+        // TODO SERVER-135416. Remove this block once many generations can coexist
+        if (sampleGenId.has_value() && sampleGenId.value() != genId.getValue()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream() << "persistent sample pages belong to generations "
+                                        << sampleGenId.value() << " and " << genId.getValue());
+        }
+        sampleGenId = genId.getValue();
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 std::string makePersistentSampleId(const UUID& collectionUuid,
                                    SamplingTechniqueEnum method,
                                    size_t requestedSampleSize,
                                    boost::optional<int> numChunks,
-                                   int pageNo) {
+                                   int pageNo,
+                                   boost::optional<uint64_t> genId) {
     tassert(13321001, "Persistent sample page number must be non-negative", pageNo >= 0);
 
     const size_t width = pageNoWidth(requestedSampleSize);
@@ -172,6 +219,9 @@ std::string makePersistentSampleId(const UUID& collectionUuid,
 
     std::string id =
         makePersistentSampleIdPrefix(collectionUuid, method, requestedSampleSize, numChunks);
+    if (genId.has_value()) {
+        fmt::format_to(std::back_inserter(id), "{}{}", genId.value(), kIdSeparator);
+    }
     fmt::format_to(std::back_inserter(id), "{:0{}}", pageNo, width);
     return id;
 }
@@ -190,6 +240,70 @@ std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& coll
     minId.append(width, '0');
     maxId.append(width, '9');
     return {std::move(minId), std::move(maxId)};
+}
+
+std::pair<std::string, std::string> makePersistentSampleAllGenerationsIdRange(
+    const UUID& collectionUuid,
+    SamplingTechniqueEnum method,
+    size_t requestedSampleSize,
+    boost::optional<int> numChunks) {
+    std::string minId =
+        makePersistentSampleIdPrefix(collectionUuid, method, requestedSampleSize, numChunks);
+    std::string maxId = minId;
+    // The maxId is set to the successor of the ID separator to include all generations.
+    // separator is '_', successor is '`'
+    // Example:
+    // min = "<UUID>_random_384_" (gen Id would be appended here)
+    // max = "<UUID>_random_384`"
+    maxId.back() = kIdSeparatorSuccessor;
+    return {std::move(minId), std::move(maxId)};
+}
+
+StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
+                                                const UUID& collectionUuid,
+                                                SamplingTechniqueEnum method,
+                                                size_t requestedSampleSize,
+                                                boost::optional<int> numChunks) {
+    const auto malformed = [&] {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "persistent sample _id '" << id
+                                    << "' does not have the layout of a page of the sample");
+    };
+
+    const std::string prefix =
+        makePersistentSampleIdPrefix(collectionUuid, method, requestedSampleSize, numChunks);
+    if (!id.starts_with(prefix)) {
+        return malformed();
+    }
+    const std::string_view genIdAndPageNo = id.substr(prefix.size());
+
+    const size_t width = pageNoWidth(requestedSampleSize);
+    if (genIdAndPageNo.size() < width) {
+        return malformed();
+    }
+    const std::string_view pageNo = genIdAndPageNo.substr(genIdAndPageNo.size() - width);
+    if (!std::all_of(pageNo.begin(), pageNo.end(), ctype::isDigit)) {
+        return malformed();
+    }
+    // TODO SERVER-135416. Remove this block once write path always adds a gen_id.
+    if (genIdAndPageNo.size() == width) {
+        return kDefaultPersistentSampleGenId;
+    }
+
+    const std::string_view genIdAndSeparator =
+        genIdAndPageNo.substr(0, genIdAndPageNo.size() - width);
+    if (genIdAndSeparator.back() != kIdSeparator) {
+        return malformed();
+    }
+    const std::string_view genIdDigits = genIdAndSeparator.substr(0, genIdAndSeparator.size() - 1);
+    uint64_t genId = 0;
+    const auto [end, ec] =
+        std::from_chars(genIdDigits.data(), genIdDigits.data() + genIdDigits.size(), genId);
+    if (!isCanonicalDecimal(genIdDigits) || ec != std::errc{} ||
+        end != genIdDigits.data() + genIdDigits.size()) {
+        return malformed();
+    }
+    return genId;
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
@@ -305,7 +419,8 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
             page.getRequestedSamplingMethod() != reassembled.getRequestedSamplingMethod() ||
             page.getRequestedSampleSize() != reassembled.getRequestedSampleSize() ||
             page.getNumChunks() != reassembled.getNumChunks() ||
-            page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
+            page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded() ||
+            page.getNumPages() != reassembled.getNumPages()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "persistent sample pages disagree on their identity fields");
         }
@@ -322,6 +437,15 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
                               << allDocs.size() << ") exceeds declared 'requestedSampleSize' ("
                               << totalMaxSampleSize << ")");
         }
+    }
+
+    // TODO SERVER-135416: Refuse as UnsupportedFormat when numPages is missing.
+    if (reassembled.getNumPages().has_value() &&
+        static_cast<size_t>(reassembled.getNumPages().value()) != pages.size()) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream()
+                          << "persistent sample declares " << reassembled.getNumPages().value()
+                          << " pages but " << pages.size() << " were found");
     }
 
     reassembled.setDocs(std::move(allDocs));
@@ -422,14 +546,21 @@ StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
 
     // Perform a bounded range scan on the clustered samples collection to retrieve all pages in a
     // sample ordered by pageNo.
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(collectionUuid, method, spec.requestedSampleSize, numChunks);
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
+        collectionUuid, method, spec.requestedSampleSize, numChunks);
 
     auto scanStatus = findPersistentSamplePages(_opCtx, samplesNss, minId, maxId);
 
     if (!scanStatus.isOK()) {
         recordPersistentSampleFailure(scanStatus.getStatus());
         return scanStatus.getStatus();
+    }
+
+    const auto genIdStatus = checkSingleGeneration(
+        scanStatus.getValue(), collectionUuid, method, spec.requestedSampleSize, numChunks);
+    if (!genIdStatus.isOK()) {
+        recordPersistentSampleFailure(genIdStatus);
+        return genIdStatus;
     }
 
     const size_t pagesRead = scanStatus.getValue().size();

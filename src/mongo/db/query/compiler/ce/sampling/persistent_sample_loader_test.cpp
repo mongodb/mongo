@@ -11,6 +11,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -54,6 +55,35 @@ DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, FullCollScanIsRejected, "12832
 
 DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, PageNoWiderThanSampleSizeIsRejected, "13321000") {
     makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, /*pageNo=*/100);
+}
+
+TEST(MakePersistentSampleId, GenIdPrecedesThePageNoUnpadded) {
+    ASSERT_EQ(
+        makePersistentSampleId(
+            kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, /*pageNo=*/7, /*genId=*/0),
+        expectedId("random", "384_0_007"));
+    ASSERT_EQ(makePersistentSampleId(kUuid,
+                                     SamplingTechniqueEnum::kRandom,
+                                     384,
+                                     boost::none,
+                                     /*pageNo=*/7,
+                                     /*genId=*/145),
+              expectedId("random", "384_145_007"));
+    ASSERT_EQ(makePersistentSampleId(kUuid,
+                                     SamplingTechniqueEnum::kChunk,
+                                     384,
+                                     /*numChunks=*/10,
+                                     /*pageNo=*/0,
+                                     /*genId=*/3),
+              expectedId("chunk", "384_10_3_000"));
+    // 18446744073709551615 is 2^64 - 1, the max uint64_t.
+    ASSERT_EQ(makePersistentSampleId(kUuid,
+                                     SamplingTechniqueEnum::kRandom,
+                                     384,
+                                     boost::none,
+                                     /*pageNo=*/0,
+                                     /*genId=*/std::numeric_limits<uint64_t>::max()),
+              expectedId("random", "384_18446744073709551615_000"));
 }
 
 TEST(MakePersistentSampleId, IsDeterministic) {
@@ -172,6 +202,136 @@ TEST(MakePersistentSampleIdRange, DifferentNumChunksYieldDisjointRanges) {
     const auto [otherMin, otherMax] =
         makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
     ASSERT_TRUE(otherMin > maxId || otherMax < minId);
+}
+
+TEST(MakePersistentSampleAllGenerationsIdRange, BoundsAreTheIdentityPrefixAndItsSuccessor) {
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
+        kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    ASSERT_EQ(minId, expectedId("random", "384_"));
+    ASSERT_EQ(maxId, expectedId("random", "384`"));
+
+    const auto [chunkMin, chunkMax] = makePersistentSampleAllGenerationsIdRange(
+        kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    ASSERT_EQ(chunkMin, expectedId("chunk", "384_10_"));
+    ASSERT_EQ(chunkMax, expectedId("chunk", "384_10`"));
+}
+
+TEST(MakePersistentSampleAllGenerationsIdRange, BracketsEveryPageOfEveryGeneration) {
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
+        kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    for (int pageNo : {0, 1, 42, 383}) {
+        const auto idWithoutGenId =
+            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+        ASSERT_LTE(minId, idWithoutGenId);
+        ASSERT_LT(idWithoutGenId, maxId);
+        for (uint64_t genId : {uint64_t{0},
+                               uint64_t{1},
+                               uint64_t{9},
+                               uint64_t{10},
+                               uint64_t{99},
+                               uint64_t{145},
+                               uint64_t{2147483648},
+                               std::numeric_limits<uint64_t>::max()}) {
+            const auto id = makePersistentSampleId(
+                kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo, genId);
+            ASSERT_LTE(minId, id);
+            ASSERT_LT(id, maxId);
+        }
+    }
+}
+
+TEST(MakePersistentSampleAllGenerationsIdRange, ExcludesOtherSamples) {
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
+        kUuid, SamplingTechniqueEnum::kRandom, 1, boost::none);
+
+    const std::vector<std::string> outsiders{
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, 9),
+        makePersistentSampleId(
+            kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, /*pageNo=*/9, /*genId=*/9),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 100, boost::none, 0),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 1, /*numChunks=*/1),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 1, boost::none),
+        makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 1, boost::none),
+    };
+    for (const auto& id : outsiders) {
+        ASSERT_TRUE(id < minId || id >= maxId) << "id unexpectedly inside range: " << id;
+    }
+}
+
+StatusWith<uint64_t> parseRandomGenId(std::string_view id) {
+    return parsePersistentSampleGenId(id, kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+}
+
+TEST(ParsePersistentSampleGenId, IdWithoutGenIdBelongsToTheDefaultGeneration) {
+    for (int pageNo : {0, 7, 383}) {
+        const auto genId = parseRandomGenId(makePersistentSampleId(
+            kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo));
+        ASSERT_OK(genId.getStatus());
+        ASSERT_EQ(genId.getValue(), kDefaultPersistentSampleGenId);
+    }
+}
+
+TEST(ParsePersistentSampleGenId, ParsesTheGenIdBeforeThePageNo) {
+    for (uint64_t genId : {uint64_t{0},
+                           uint64_t{1},
+                           uint64_t{9},
+                           uint64_t{10},
+                           uint64_t{145},
+                           uint64_t{2147483648},
+                           std::numeric_limits<uint64_t>::max()}) {
+        for (int pageNo : {0, 7, 383}) {
+            const auto parsed = parseRandomGenId(makePersistentSampleId(
+                kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo, genId));
+            ASSERT_OK(parsed.getStatus());
+            ASSERT_EQ(parsed.getValue(), genId);
+        }
+    }
+    ASSERT_EQ(parseRandomGenId(expectedId("random", "384_145_007")).getValue(), 145u);
+}
+
+TEST(ParsePersistentSampleGenId, ParsesTheGenIdOfAChunkSample) {
+    const auto parsed = parsePersistentSampleGenId(expectedId("chunk", "384_10_3_000"),
+                                                   kUuid,
+                                                   SamplingTechniqueEnum::kChunk,
+                                                   384,
+                                                   /*numChunks=*/10);
+    ASSERT_OK(parsed.getStatus());
+    ASSERT_EQ(parsed.getValue(), 3u);
+
+    const auto withoutGenId = parsePersistentSampleGenId(expectedId("chunk", "384_10_000"),
+                                                         kUuid,
+                                                         SamplingTechniqueEnum::kChunk,
+                                                         384,
+                                                         /*numChunks=*/10);
+    ASSERT_OK(withoutGenId.getStatus());
+    ASSERT_EQ(withoutGenId.getValue(), kDefaultPersistentSampleGenId);
+}
+
+TEST(ParsePersistentSampleGenId, RejectsIdsOfOtherSamples) {
+    for (const auto& id :
+         {makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none),
+          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 384, boost::none),
+          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 385, boost::none),
+          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 38, boost::none)}) {
+        ASSERT_EQ(parseRandomGenId(id).getStatus().code(), ErrorCodes::UnsupportedFormat) << id;
+    }
+}
+
+TEST(ParsePersistentSampleGenId, RejectsMalformedGenIdsAndPageNos) {
+    for (std::string_view genIdAndPageNo : {"",
+                                            "07",
+                                            "0007",
+                                            "_000",
+                                            "01_000",
+                                            "-1_000",
+                                            "1a_000",
+                                            "1_00a",
+                                            "1_2_000",
+                                            // 2^64: one past the max uint64_t, so it overflows.
+                                            "18446744073709551616_000"}) {
+        const auto id = expectedId("random", std::string{"384_"} + std::string{genIdAndPageNo});
+        ASSERT_EQ(parseRandomGenId(id).getStatus().code(), ErrorCodes::UnsupportedFormat) << id;
+    }
 }
 
 // ── parsePersistentSample ─────────────────────────────────────────────────────────────────────
@@ -378,6 +538,60 @@ TEST(ParsePersistentSample, RejectsNegativePageNo) {
                                  /*schemaVersion=*/
                                  kPersistentSampleSchemaVersion,
                                  BSON(PersistentSampleDoc::kPageNoFieldName << -1)));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(ParsePersistentSample, PopulatesNumPages) {
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 /*overrides=*/BSONObj{},
+                                 /*pageNo=*/0,
+                                 /*numDocsDiscarded=*/0,
+                                 /*genId=*/boost::none,
+                                 /*numPages=*/3));
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue().getNumPages(), 3);
+}
+
+TEST(ParsePersistentSample, AcceptsMissingNumPages) {
+    auto result = parsePersistentSample(buildPersistentSampleDoc(
+        UUID::gen(), SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), kStubSampleDocs));
+    ASSERT_OK(result.getStatus());
+    ASSERT_FALSE(result.getValue().getNumPages().has_value());
+}
+
+TEST(ParsePersistentSample, RejectsNonPositiveNumPages) {
+    for (int numPages : {0, -1}) {
+        auto result = parsePersistentSample(
+            buildPersistentSampleDoc(UUID::gen(),
+                                     SamplingTechniqueEnum::kRandom,
+                                     /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                     /*docs=*/kStubSampleDocs,
+                                     /*numChunks=*/boost::none,
+                                     /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                     /*overrides=*/BSONObj{},
+                                     /*pageNo=*/0,
+                                     /*numDocsDiscarded=*/0,
+                                     /*genId=*/boost::none,
+                                     numPages));
+        ASSERT_NOT_OK(result.getStatus());
+    }
+}
+
+TEST(ParsePersistentSample, RejectsNonNumericNumPages) {
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 BSON(PersistentSampleDoc::kNumPagesFieldName << "three")));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -598,6 +812,56 @@ TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
     ASSERT_TRUE(sample.getNumChunks().has_value());
     ASSERT_EQUALS(sample.getNumChunks().value(), 1);
     ASSERT_EQUALS(sample.getDocs().size(), 2u);
+}
+
+BSONObj buildPageOfNumPages(const UUID& uuid, int pageNo, int numPages) {
+    return buildPage(uuid,
+                     SamplingTechniqueEnum::kRandom,
+                     /*requestedSampleSize=*/4,
+                     {BSON("a" << pageNo)},
+                     pageNo,
+                     /*numChunks=*/boost::none,
+                     /*numDocsDiscarded=*/0,
+                     /*genId=*/0,
+                     numPages);
+}
+
+TEST(ReassemblePersistentSample, AcceptsAllPagesDeclaredByNumPages) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample(
+        {buildPageOfNumPages(uuid, /*pageNo=*/0, 2), buildPageOfNumPages(uuid, /*pageNo=*/1, 2)});
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().getDocs().size(), 2u);
+}
+
+TEST(ReassemblePersistentSample, FewerPagesThanNumPagesRejected) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample(
+        {buildPageOfNumPages(uuid, /*pageNo=*/0, 3), buildPageOfNumPages(uuid, /*pageNo=*/1, 3)});
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, MorePagesThanNumPagesRejected) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample(
+        {buildPageOfNumPages(uuid, /*pageNo=*/0, 1), buildPageOfNumPages(uuid, /*pageNo=*/1, 1)});
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, MissingNumPagesIsNotChecked) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample(
+        {buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 0)}, /*pageNo=*/0),
+         buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 1)}, /*pageNo=*/1)});
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().getDocs().size(), 2u);
+}
+
+TEST(ReassemblePersistentSample, PagesDisagreeingOnNumPagesRejected) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample(
+        {buildPageOfNumPages(uuid, /*pageNo=*/0, 2), buildPageOfNumPages(uuid, /*pageNo=*/1, 3)});
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
 }  // namespace

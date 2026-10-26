@@ -15,6 +15,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -28,6 +29,8 @@ using namespace std::literals::string_view_literals;
 
 inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"sv;
 inline constexpr int kPersistentSampleSchemaVersion = 1;
+// gen_ids are uint64_t: at one refresh per second they would take ~584 billion years to overflow.
+inline constexpr uint64_t kDefaultPersistentSampleGenId = 0;
 
 /**
  * Builds the `_id` string for a persisted sample page document:
@@ -45,16 +48,30 @@ std::string makePersistentSampleId(const UUID& collectionUuid,
                                    SamplingTechniqueEnum method,
                                    size_t requestedSampleSize,
                                    boost::optional<int> numChunks,
-                                   int pageNo = 0);
+                                   int pageNo = 0,
+                                   // TODO SERVER-135416: Make non optional.
+                                   boost::optional<uint64_t> genId = boost::none);
 
 /**
  * Returns the inclusive [min, max] `_id` bounds spanning every page a sample with the given
- * identity values could have.
+ * identity values could have, for `_id`s without a gen_id.
  */
 std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
                                                                 SamplingTechniqueEnum method,
                                                                 size_t requestedSampleSize,
                                                                 boost::optional<int> numChunks);
+
+std::pair<std::string, std::string> makePersistentSampleAllGenerationsIdRange(
+    const UUID& collectionUuid,
+    SamplingTechniqueEnum method,
+    size_t requestedSampleSize,
+    boost::optional<int> numChunks);
+
+StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
+                                                const UUID& collectionUuid,
+                                                SamplingTechniqueEnum method,
+                                                size_t requestedSampleSize,
+                                                boost::optional<int> numChunks);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 

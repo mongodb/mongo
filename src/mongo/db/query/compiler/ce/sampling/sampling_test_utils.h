@@ -335,7 +335,9 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
                                  BSONObj overrides = BSONObj(),
                                  int pageNo = 0,
-                                 size_t numDocsDiscarded = 0);
+                                 size_t numDocsDiscarded = 0,
+                                 boost::optional<uint64_t> genId = boost::none,
+                                 boost::optional<int> numPages = boost::none);
 
 /**
  * Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
@@ -347,7 +349,9 @@ BSONObj buildPage(const UUID& uuid,
                   const std::vector<BSONObj>& docs,
                   int pageNo,
                   boost::optional<int> numChunks = boost::none,
-                  size_t numDocsDiscarded = 0);
+                  size_t numDocsDiscarded = 0,
+                  boost::optional<uint64_t> genId = boost::none,
+                  boost::optional<int> numPages = boost::none);
 
 /**
  * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the

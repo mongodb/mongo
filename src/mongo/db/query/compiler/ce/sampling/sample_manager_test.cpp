@@ -467,6 +467,112 @@ TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsNonClusteredSamplesCollecti
     ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
+TEST_F(SamplingEstimatorTest, PersistentLoaderLoadsSampleWithGenIdInItsIds) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted"),
+                                             BSON("_id" << 11 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
+        {buildPage(uuid,
+                   SamplingTechniqueEnum::kRandom,
+                   persistedDocs.size(),
+                   {persistedDocs[0]},
+                   /*pageNo=*/0,
+                   /*numChunks=*/boost::none,
+                   /*numDocsDiscarded=*/0,
+                   /*genId=*/9),
+         buildPage(uuid,
+                   SamplingTechniqueEnum::kRandom,
+                   persistedDocs.size(),
+                   {persistedDocs[1]},
+                   /*pageNo=*/1,
+                   /*numChunks=*/boost::none,
+                   /*numDocsDiscarded=*/0,
+                   /*genId=*/9)},
+        /*clustered=*/true);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, persistedDocs.size()));
+    ASSERT_OK(loaded.getStatus());
+    ASSERT_EQUALS(loaded.getValue().numPages().value(), 2u);
+    ASSERT_EQUALS(loaded.getValue().size(), persistedDocs.size());
+    for (size_t i = 0; i < persistedDocs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(loaded.getValue().docs()[i], persistedDocs[i]);
+    }
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsSampleSpanningGenerations) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
+        {buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("_id" << 10)}, /*pageNo=*/0),
+         buildPage(uuid,
+                   SamplingTechniqueEnum::kRandom,
+                   2,
+                   {BSON("_id" << 11)},
+                   /*pageNo=*/1,
+                   /*numChunks=*/boost::none,
+                   /*numDocsDiscarded=*/0,
+                   /*genId=*/1)},
+        /*clustered=*/true);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 2));
+    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderIgnoresSamplesOfOtherSizes) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
+        {buildPage(uuid,
+                   SamplingTechniqueEnum::kRandom,
+                   10,
+                   {BSON("_id" << 10)},
+                   /*pageNo=*/0,
+                   /*numChunks=*/boost::none,
+                   /*numDocsDiscarded=*/0,
+                   /*genId=*/0)},
+        /*clustered=*/true);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 1));
+    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::NoSuchKey);
+}
+
 // ── makePersistentSamplePageDocs ──────────────────────────────────────────────────────────────
 
 namespace {

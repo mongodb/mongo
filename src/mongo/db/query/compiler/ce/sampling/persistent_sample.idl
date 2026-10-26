@@ -33,6 +33,11 @@ structs:
             pageNo:
                 type: int
                 validator: {gte: 0}
+            # TODO SERVER-135416: Make non optional.
+            numPages:
+                type: int
+                optional: true
+                validator: {gt: 0}
             schemaVersion:
                 type: int
                 validator: {gte: 1}
