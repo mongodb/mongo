@@ -557,6 +557,11 @@ py_test(
 py_test(
     name = "test_create_todo_tickets",
     srcs = ["test_create_todo_tickets.py"],
+    target_compatible_with = select({
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:create_todo_tickets",
