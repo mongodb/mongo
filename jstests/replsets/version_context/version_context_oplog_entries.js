@@ -15,7 +15,19 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
-let rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {
+        setParameter: {
+            // The default of 5 ms for 'batchedDeletesTargetBatchTimeMS' may
+            // cause the batched delete stage to split the delete into multiple
+            // batches, and a batch containing a single delete is logged as a
+            // plain 'd' entry, not as applyOps. Setting it to zero ensures that
+            // all deletes are committed in a single batch.
+            batchedDeletesTargetBatchTimeMS: 0,
+        },
+    },
+});
 rst.startSet();
 rst.initiate();
 const conn = rst.getPrimary();
