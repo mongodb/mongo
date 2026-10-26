@@ -233,7 +233,7 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         } else if (self.stateStr !== "SECONDARY") {
             continue;
         }
-        if (conn.adminCommand({isMaster: 1}).arbiterOnly) {
+        if (assert.commandWorked(conn.adminCommand({isMaster: 1})).arbiterOnly) {
             continue;
         }
         members.push(conn);
@@ -244,7 +244,10 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         return {ok: 1};
     }
 
-    if (!primary.adminCommand({serverStatus: 1}).storageEngine.supportsSnapshotReadConcern) {
+    if (
+        !assert.commandWorked(primary.adminCommand({serverStatus: 1})).storageEngine
+            .supportsSnapshotReadConcern
+    ) {
         print(
             "Skipping multikey consistency check: storage engine does not support snapshot reads " +
                 "on " +
