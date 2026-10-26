@@ -134,19 +134,32 @@ private:
 
 /**
  * When in scope, enforces prepare conflicts in the storage engine. Reads and writes in this scope
- * will block on accessing an already updated document which is in prepared state. And they will
- * unblock after the prepared transaction that performed the update commits/aborts.
+ * will block or throw until the conflicting transaction resolves.
  */
 class [[MONGO_MOD_PUBLIC]] EnforcePrepareConflictsBlock {
 public:
-    explicit EnforcePrepareConflictsBlock(OperationContext* opCtx)
+    enum class Behavior {
+        kBlock,
+        kThrow,
+    };
+
+    EnforcePrepareConflictsBlock(OperationContext* opCtx, Behavior behavior)
         : _opCtx(opCtx),
           _originalValue(shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior()) {
+        auto prepareConflictBehavior = [behavior] {
+            switch (behavior) {
+                case Behavior::kBlock:
+                    return PrepareConflictBehavior::kEnforce;
+                case Behavior::kThrow:
+                    return PrepareConflictBehavior::kThrow;
+            }
+            MONGO_UNREACHABLE;
+        }();
         // It is illegal to call setPrepareConflictBehavior() while any storage transaction is
         // active. setPrepareConflictBehavior() invariants that there is no active storage
         // transaction.
         shard_role_details::getRecoveryUnit(_opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kEnforce);
+            prepareConflictBehavior);
     }
 
     ~EnforcePrepareConflictsBlock() {

@@ -5,6 +5,7 @@
 
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -75,6 +76,7 @@ public:
 
 TEST_F(WiredTigerPrepareConflictTest, IgnoreBehaviorClassification) {
     EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::kEnforce));
+    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::kThrow));
     EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflicts));
     EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflictsAllowWrites));
 }
@@ -136,6 +138,73 @@ TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {
                        StorageUnavailableException,
                        ErrorCodes::WriteConflict);
     ASSERT_EQ(tracker.getThisOpPrepareConflictCount(), 0);
+}
+
+TEST_F(WiredTigerPrepareConflictTest, ThrowPrepareConflictCountsWithoutWaiting) {
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    recoveryUnit->setBlockingAllowed(false);
+    auto generation = recoveryUnit->getPrepareCommitOrAbortCount();
+    auto conflictsBefore = PrepareConflictTracker::getGlobalNumPrepareConflicts();
+    auto waitMicrosBefore = PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros();
+    PrepareConflictTracker tracker;
+    try {
+        wiredTigerPrepareConflictRetry(
+            interruptible, tracker, *recoveryUnit, [] { return WT_PREPARE_CONFLICT; });
+        FAIL("Expected a prepare conflict");
+    } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
+        EXPECT_EQ(ex->generation(), generation);
+        EXPECT_EQ(ex.code(), ErrorCodes::PrepareConflict);
+    }
+    EXPECT_EQ(tracker.getThisOpPrepareConflictCount(), 1);
+    EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), conflictsBefore + 1);
+    EXPECT_EQ(tracker.getThisOpPrepareConflictDuration(), Microseconds(0));
+    EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(),
+              waitMicrosBefore);
+    EXPECT_FALSE(tracker.isWaitingOnPrepareConflict());
+}
+
+TEST_F(WiredTigerPrepareConflictTest, ResolutionBetweenReadAndWaitIsNotLost) {
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    auto* connection = WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
+    PrepareConflictTracker tracker;
+    try {
+        wiredTigerPrepareConflictRetry(interruptible, tracker, *recoveryUnit, [&] {
+            connection->notifyPreparedUnitOfWorkHasCommittedOrAborted();
+            return WT_PREPARE_CONFLICT;
+        });
+        FAIL("Expected a prepare conflict");
+    } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
+        EXPECT_GT(recoveryUnit->getPrepareCommitOrAbortCount(), ex->generation());
+        // An unbounded wait must return immediately even though notification preceded the wait.
+        recoveryUnit->waitForPrepareConflictResolution(interruptible, ex->generation());
+    }
+    EXPECT_FALSE(tracker.isWaitingOnPrepareConflict());
+}
+
+TEST_F(WiredTigerPrepareConflictTest, NotificationDoesNotSuppressAnotherConflict) {
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    auto* connection = WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
+    PrepareConflictTracker tracker;
+    auto conflictsBefore = PrepareConflictTracker::getGlobalNumPrepareConflicts();
+    auto waitMicrosBefore = PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros();
+    auto alwaysConflict = [] {
+        return WT_PREPARE_CONFLICT;
+    };
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        try {
+            wiredTigerPrepareConflictRetry(interruptible, tracker, *recoveryUnit, alwaysConflict);
+            FAIL("Expected a prepare conflict");
+        } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
+            connection->notifyPreparedUnitOfWorkHasCommittedOrAborted();
+            recoveryUnit->waitForPrepareConflictResolution(interruptible, ex->generation());
+        }
+    }
+    EXPECT_EQ(tracker.getThisOpPrepareConflictCount(), 2);
+    EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), conflictsBefore + 2);
+    EXPECT_FALSE(tracker.isWaitingOnPrepareConflict());
+    EXPECT_EQ(tracker.getThisOpPrepareConflictDuration(), Microseconds(0));
+    EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(),
+              waitMicrosBefore);
 }
 
 TEST_F(WiredTigerPrepareConflictTest, NotificationBeforeWaitIsNotLost) {

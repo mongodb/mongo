@@ -26,6 +26,7 @@ using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
 static int getIgnorePrepareConfig(PrepareConflictBehavior behavior) {
     switch (behavior) {
         case PrepareConflictBehavior::kEnforce:
+        case PrepareConflictBehavior::kThrow:
             return 0;
         case PrepareConflictBehavior::kIgnoreConflicts:
             return 1;

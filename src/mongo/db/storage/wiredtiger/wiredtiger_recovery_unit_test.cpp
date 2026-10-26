@@ -18,6 +18,7 @@
 #include "mongo/db/storage/recovery_unit_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -350,6 +351,46 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, ThrowModeEnforcesDefaultAndCompiledConfigurations) {
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "prepared");
+    cursor->set_value(cursor, "value");
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
+    ru1->setPrepareTimestamp({1, 1});
+    ru1->prepareUnitOfWork();
+
+    for (const bool allowUntimestampedWrite : {false, true}) {
+        ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+        if (allowUntimestampedWrite) {
+            ru2->allowOneUntimestampedWrite();
+        }
+        ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
+        getCursor(ru2, &cursor);
+        cursor->set_key(cursor, "prepared");
+        EXPECT_EQ(cursor->search(cursor), WT_PREPARE_CONFLICT);
+
+        PrepareConflictTracker tracker;
+        EXPECT_THAT(
+            [&] {
+                wiredTigerPrepareConflictRetry(
+                    *clientAndCtx2.second, tracker, *ru2, [&] { return cursor->search(cursor); });
+            },
+            testing::Throws<ExceptionFor<ErrorCodes::PrepareConflict>>(
+                unittest::match::CodeIs(ErrorCodes::PrepareConflict)));
+        EXPECT_FALSE(tracker.isWaitingOnPrepareConflict());
+        EXPECT_EQ(tracker.getThisOpPrepareConflictCount(), 1);
+        EXPECT_EQ(tracker.getThisOpPrepareConflictDuration(), Microseconds(0));
+
+        cursor->set_key(cursor, "unrelated");
+        cursor->set_value(cursor, "value");
+        EXPECT_EQ(wiredTigerCursorInsert(*ru2, cursor), 0);
+        ru2->abortUnitOfWork();
+    }
+    ru1->abortUnitOfWork();
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture,

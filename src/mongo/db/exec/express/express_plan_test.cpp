@@ -531,7 +531,16 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyTruncatesRemaini
 // Reads that enforce prepare conflicts -- multi-document transactions, snapshot/linearizable read
 // concern, or any read with 'afterClusterTime' -- never reach the miss branch's return at all:
 // 'logRecordNotFound()' uasserts first. This is the narrower case, not the common one.
-TEST_F(ExpressPlanTest,
+class ExpressPlanPrepareConflictTest : public ExpressPlanTest,
+                                       public testing::WithParamInterface<PrepareConflictBehavior> {
+};
+
+INSTANTIATE_TEST_SUITE_P(AllEnforcementBehaviors,
+                         ExpressPlanPrepareConflictTest,
+                         testing::Values(PrepareConflictBehavior::kEnforce,
+                                         PrepareConflictBehavior::kThrow));
+
+TEST_P(ExpressPlanPrepareConflictTest,
        TestLookupViaUserIndexWithOrphanIndexKeyThrowsWhenEnforcingPrepareConflicts) {
     std::string_view indexName = "a_1"sv;
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
@@ -544,6 +553,10 @@ TEST_F(ExpressPlanTest,
     auto indexEntry =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
     ASSERT(indexEntry);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    ru.abandonSnapshot();
+    ru.setPrepareConflictBehavior(GetParam());
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 5}");

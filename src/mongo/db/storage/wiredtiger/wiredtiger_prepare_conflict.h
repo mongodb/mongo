@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/prepare_conflict_info.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -46,9 +47,18 @@ int wiredTigerPrepareConflictRetry(Interruptible& interruptible,
                                    PrepareConflictTracker& tracker,
                                    RecoveryUnit& ru,
                                    F&& f) {
+    const auto generation = ru.getPrepareConflictBehavior() == PrepareConflictBehavior::kThrow
+        ? boost::make_optional(ru.getPrepareCommitOrAbortCount())
+        : boost::none;
     int ret = WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
+
+    if (generation) {
+        tracker.recordPrepareConflict();
+        uasserted(PrepareConflictInfo{*generation},
+                  "Prepared transaction must resolve before retrying this operation");
+    }
 
     return wiredTigerPrepareConflictRetrySlow(interruptible, tracker, ru, f);
 }

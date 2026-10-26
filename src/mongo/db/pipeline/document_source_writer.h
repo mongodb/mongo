@@ -32,7 +32,8 @@ class DocumentSourceWriteBlock {
 
 public:
     DocumentSourceWriteBlock(OperationContext* opCtx)
-        : _opCtx(opCtx), _enforcePrepareConflictsBlock(opCtx) {
+        : _opCtx(opCtx),
+          _enforcePrepareConflictsBlock(opCtx, EnforcePrepareConflictsBlock::Behavior::kBlock) {
         _originalArgs = repl::ReadConcernArgs::get(_opCtx);
         _originalSource = shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
         if (_originalSource == RecoveryUnit::ReadSource::kProvided) {

@@ -43,6 +43,12 @@ enum class PrepareConflictBehavior {
     kEnforce = 0,
 
     /**
+     * When a prepare conflict is encountered, throw an exception. Callers must unwind their WUOW
+     * and release locks before waiting for resolution and retrying.
+     */
+    kThrow,
+
+    /**
      * Ignore prepare conflicts when they are encountered.
      *
      * When a prepared update is encountered, the previous version of a record will be returned.
@@ -69,6 +75,7 @@ enum class PrepareConflictBehavior {
 inline bool ignoresPrepareConflicts(PrepareConflictBehavior behavior) {
     switch (behavior) {
         case PrepareConflictBehavior::kEnforce:
+        case PrepareConflictBehavior::kThrow:
             return false;
         case PrepareConflictBehavior::kIgnoreConflicts:
         case PrepareConflictBehavior::kIgnoreConflictsAllowWrites:
