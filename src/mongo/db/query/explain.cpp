@@ -422,7 +422,7 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
     } else {
         // A strategy decided, so it must have recorded why (it populated the same explain data
         // this value comes from).
-        // TODO SERVER-134550 Remove the condition on SBE explainer and the extra bool parameter.
+        // TODO SERVER-136210 Remove the condition on SBE explainer and the extra bool parameter.
         tassert(13237700,
                 "a ranking strategy decided the winning plan but recorded no reason",
                 reason.has_value() || isSbeExplainer);
