@@ -150,9 +150,15 @@ assert(
     statusAfterWMaj.initialSyncStatus,
     () => "Response should have an 'initialSyncStatus' field: " + tojson(statusAfterWMaj),
 );
-// We should have applied at least 6 documents, not 5, as fetching and applying are inclusive of the
-// sync source's lastApplied.
-assert.gte(statusAfterWMaj.initialSyncStatus.appliedOps, 6);
+// We should have applied at least the 5 documents inserted above. Fetching is inclusive of the sync
+// source's lastApplied, so at least 6 entries were fetched; the one at the beginApplyingTimestamp is
+// written to the oplog but not applied (older binaries counted it in 'appliedOps').
+assert.gte(statusAfterWMaj.initialSyncStatus.appliedOps, 5);
+assert.gte(
+    statusAfterWMaj.initialSyncStatus.appliedOps +
+        (statusAfterWMaj.initialSyncStatus.writtenNotAppliedOps ?? 0),
+    6,
+);
 
 // Turn off the last failpoint and wait for the node to finish initial sync.
 assert.commandWorked(

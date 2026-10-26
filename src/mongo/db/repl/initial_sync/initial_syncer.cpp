@@ -27,6 +27,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -65,6 +66,7 @@
 #include "mongo/util/timer.h"
 #include "mongo/util/version/releases.h"
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string_view>
@@ -364,6 +366,7 @@ void InitialSyncer::_cancelRemainingWork(WithLock lk) {
     _shutdownComponent(lk, _fCVFetcher);
     _shutdownComponent(lk, _lastOplogEntryFetcher);
     _shutdownComponent(lk, _beginFetchingOpTimeFetcher);
+    _shutdownComponent(lk, _oldestOplogEntryFetcher);
     _shutdownComponent(lk, _fastCountTimestampStoreFetcher);
     _shutdownComponent(lk, _fastCountOldestOplogEntryFetcher);
     (*_attemptExec)->shutdown();
@@ -457,6 +460,8 @@ void InitialSyncer::_appendInitialSyncProgressMinimal(WithLock lk, BSONObjBuilde
         }
     }
     bob->appendNumber("appliedOps", static_cast<long long>(_initialSyncState->appliedOps));
+    bob->appendNumber("writtenNotAppliedOps",
+                      static_cast<long long>(_initialSyncState->writtenNotAppliedOps));
     if (!_initialSyncState->beginApplyingTimestamp.isNull()) {
         bob->append("initialSyncOplogStart", _initialSyncState->beginApplyingTimestamp);
     }
@@ -701,6 +706,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     _opts.resetOptimes();
     _lastApplied = {OpTime(), Date_t()};
     _lastFetched = {};
+    _attemptRewoundToInitiatingSet = false;
 
     LOGV2_DEBUG(
         21167, 2, "Resetting the oldest timestamp before starting this initial sync attempt");
@@ -1109,6 +1115,133 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
         initialSyncHangAfterGettingBeginFetchingTimestamp.pauseWhileSet();
     }
 
+    // Before moving on, check whether the sync source's oplog still begins at the 'initiating set'
+    // entry. See _handleOldestOplogEntryForInitiatingSetResponse().
+    if (initialSyncFetchFromInitiatingSetEntry && !_skipInitiatingSetRewind) {
+        _scheduleGetOldestOplogEntryForInitiatingSet(lock, onCompletionGuard, beginFetchingOpTime);
+    } else {
+        _scheduleFastCountOrBeginApplyingTimestampFetcher(
+            lock, onCompletionGuard, beginFetchingOpTime);
+    }
+}
+
+void InitialSyncer::_scheduleGetOldestOplogEntryForInitiatingSet(
+    WithLock lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    // Bound the find the same way the oplog fetcher bounds its initial find on the sync source's
+    // oplog, so that an unresponsive sync source fails this attempt instead of hanging it.
+    const Milliseconds findMaxTime = Seconds(oplogInitialFindMaxSeconds.load());
+    const Milliseconds networkTimeout =
+        findMaxTime + Seconds(oplogNetworkTimeoutBufferSeconds.load());
+    BSONObj query = BSON(
+        "find" << NamespaceString::kRsOplogNamespace.coll() << "sort" << BSON("$natural" << 1)
+               << "limit" << 1 << "maxTimeMS" << durationCount<Milliseconds>(findMaxTime)
+               << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal.toBSONInner());
+
+    _oldestOplogEntryFetcher = std::make_unique<Fetcher>(
+        *_attemptExec,
+        _syncSource,
+        NamespaceString::kRsOplogNamespace.dbName(),
+        query,
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
+            _handleOldestOplogEntryForInitiatingSetResponse(
+                response, onCompletionGuard, beginFetchingOpTime);
+        },
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
+        networkTimeout /* find network timeout */,
+        networkTimeout /* getMore network timeout */,
+        std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load()));
+    Status scheduleStatus = _oldestOplogEntryFetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        _oldestOplogEntryFetcher.reset();
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, scheduleStatus);
+    }
+}
+
+void InitialSyncer::_handleOldestOplogEntryForInitiatingSetResponse(
+    const StatusWith<Fetcher::QueryResponse>& result,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    std::unique_lock lk(_mutex);
+    auto status = _checkForShutdownAndConvertStatus(
+        lk, result.getStatus(), "error while getting oldest oplog entry from sync source");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lk, status);
+        return;
+    }
+
+    // If the sync source's oldest oplog entry is the 'initiating set' entry, its oplog has never
+    // been truncated. Rewinding the beginFetchingTimestamp to that entry makes it the first entry
+    // of this node's oplog too. Change streams rely on it to prove that nothing has fallen off a
+    // node's oplog (see initCursorAndAssertTsHasNotFallenOff() in collection_scan.cpp); without it,
+    // a stream resumed against a freshly initial synced member of a new replica set fails with
+    // ChangeStreamHistoryLost even though the sync source could have served it.
+    //
+    // Only the fetch start moves. The extra entries are all at or before the
+    // beginApplyingTimestamp, so they are written to the oplog but never applied, the same
+    // treatment already given to entries fetched to reconstruct transaction history. In particular,
+    // a 'setFeatureCompatibilityVersion' entry in this range is skipped before it reaches the check
+    // in applyOperation() that rejects FCV changes during initial sync.
+    //
+    // The rewind is best-effort: we keep the beginFetchingTimestamp we already have if the sync
+    // source's oplog has truncated, if its oldest entry cannot be parsed, or if the rewind would
+    // fetch more than 'initialSyncFetchFromInitiatingSetEntryMaxSecs' of additional oplog.
+    const auto& docs = result.getValue().documents;
+    if (!docs.empty()) {
+        try {
+            const OplogEntryParserNonStrict oldestEntry{docs.front()};
+            const auto oldestOpTime = oldestEntry.getOpTime();
+            const bool isInitiatingSetEntry = oldestEntry.getOpType() == OpTypeEnum::kNoop &&
+                oldestEntry.getObject().getStringField(kNewPrimaryMsgField) == kInitiatingSetMsg;
+            const auto rewindSecs = static_cast<long long>(beginFetchingOpTime.getSecs()) -
+                static_cast<long long>(oldestOpTime.getSecs());
+            const auto maxRewindSecs = initialSyncFetchFromInitiatingSetEntryMaxSecs;
+            if (isInitiatingSetEntry && oldestOpTime < beginFetchingOpTime) {
+                if (rewindSecs <= maxRewindSecs) {
+                    LOGV2(12195600,
+                          "Rewinding the beginFetchingTimestamp to the sync source's 'initiating "
+                          "set' oplog entry",
+                          "syncSource"_attr = _syncSource,
+                          "previousBeginFetchingOpTime"_attr = beginFetchingOpTime,
+                          "initiatingSetOpTime"_attr = oldestOpTime);
+                    beginFetchingOpTime = oldestOpTime;
+                    _attemptRewoundToInitiatingSet = true;
+                    initial_sync_common_stats::incrementInitiatingSetRewindMetric(
+                        initial_sync_common_stats::InitiatingSetRewindOutcome::kRewound);
+                } else {
+                    LOGV2(12195601,
+                          "Not rewinding the beginFetchingTimestamp to the sync source's "
+                          "'initiating set' oplog entry because it is too old",
+                          "syncSource"_attr = _syncSource,
+                          "beginFetchingOpTime"_attr = beginFetchingOpTime,
+                          "initiatingSetOpTime"_attr = oldestOpTime,
+                          "rewindSecs"_attr = rewindSecs,
+                          "initialSyncFetchFromInitiatingSetEntryMaxSecs"_attr = maxRewindSecs);
+                    initial_sync_common_stats::incrementInitiatingSetRewindMetric(
+                        initial_sync_common_stats::InitiatingSetRewindOutcome::kSkippedTooOld);
+                }
+            }
+        } catch (const DBException& ex) {
+            LOGV2_WARNING(12195602,
+                          "Failed to parse the sync source's oldest oplog entry; not rewinding the "
+                          "beginFetchingTimestamp",
+                          "syncSource"_attr = _syncSource,
+                          "error"_attr = redact(ex));
+            initial_sync_common_stats::incrementInitiatingSetRewindMetric(
+                initial_sync_common_stats::InitiatingSetRewindOutcome::kOldestEntryParseFailure);
+        }
+    }
+
+    _scheduleFastCountOrBeginApplyingTimestampFetcher(lk, onCompletionGuard, beginFetchingOpTime);
+}
+
+void InitialSyncer::_scheduleFastCountOrBeginApplyingTimestampFetcher(
+    WithLock lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
     // When replicated fast count is enabled, beginFetchingTimestamp must be no later than the sync
     // source's persisted fast-count validAsOf so that, after seeding the counts during cloning, we
     // retain the oplog needed to advance them. We discover validAsOf by scanning the sync source's
@@ -1969,10 +2102,17 @@ void InitialSyncer::_getNextApplierBatchCallback(
         OpTime lastApplied = ops.back().getOpTime();
         Date_t lastAppliedWall = ops.back().getWallClockTime();
 
-        auto numApplied = ops.size();
+        const auto numOpsInBatch = static_cast<std::uint32_t>(ops.size());
+        // The applier skips the entries at or before the beginApplyingTimestamp after writing them
+        // to the oplog.
+        const auto beginApplyingTimestamp = _initialSyncState->beginApplyingTimestamp;
+        const auto numOpsToApply = static_cast<std::uint32_t>(
+            std::count_if(ops.begin(), ops.end(), [&](const OplogEntry& op) {
+                return op.getOpTime().getTimestamp() > beginApplyingTimestamp;
+            }));
         MultiApplier::CallbackFn onCompletionFn = [=, this](const Status& s) {
             return _multiApplierCallback(
-                s, {lastApplied, lastAppliedWall}, numApplied, onCompletionGuard);
+                s, {lastApplied, lastAppliedWall}, numOpsInBatch, numOpsToApply, onCompletionGuard);
         };
 
         _applier = std::make_unique<MultiApplier>(
@@ -2030,7 +2170,8 @@ void InitialSyncer::_getNextApplierBatchCallback(
 
 void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
                                           OpTimeAndWallTime lastApplied,
-                                          std::uint32_t numApplied,
+                                          std::uint32_t numOpsInBatch,
+                                          std::uint32_t numOpsToApply,
                                           std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     std::lock_guard<std::mutex> lock(_mutex);
     _setPhase(lock, Phase::kApplyingOplog);
@@ -2050,12 +2191,13 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
                     "Failed to apply batch",
                     "error"_attr = redact(status),
                     "batchLastOpTime"_attr = lastApplied.opTime,
-                    "numOpsInBatch"_attr = numApplied);
+                    "numOpsInBatch"_attr = numOpsInBatch);
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
     }
 
-    _initialSyncState->appliedOps += numApplied;
+    _initialSyncState->appliedOps += numOpsToApply;
+    _initialSyncState->writtenNotAppliedOps += numOpsInBatch - numOpsToApply;
     _summaryStats->appliedOps.set(_initialSyncState->appliedOps);
     _lastApplied = lastApplied;
     const auto lastAppliedOpTime = _lastApplied.opTime;
@@ -2242,6 +2384,26 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
                 "attemptsLeft"_attr =
                     (_stats.maxFailedInitialSyncAttempts - _stats.failedInitialSyncAttempts),
                 "error"_attr = redact(result.getStatus()));
+
+    // An attempt that rewound the beginFetchingTimestamp to the 'initiating set' entry also writes
+    // older entries that steady state replication would never send to this node, for example
+    // entries written under a feature compatibility version this binary does not support. If the
+    // attempt failed after cloning but before applying anything past the beginApplyingTimestamp,
+    // those entries may be the cause, so don't rewind for the rest of this initial sync.
+    if (_attemptRewoundToInitiatingSet &&
+        (_currentPhase == Phase::kDeterminingStopTimestamp ||
+         _currentPhase == Phase::kApplyingOplog) &&
+        (!_initialSyncState ||
+         _lastApplied.opTime.getTimestamp() <= _initialSyncState->beginApplyingTimestamp)) {
+        _skipInitiatingSetRewind = true;
+        initial_sync_common_stats::incrementInitiatingSetRewindMetric(
+            initial_sync_common_stats::InitiatingSetRewindOutcome::kDisabledAfterFailedAttempt);
+        LOGV2_WARNING(12195603,
+                      "Initial sync attempt failed after rewinding the beginFetchingTimestamp to "
+                      "the sync source's 'initiating set' oplog entry; not rewinding it for the "
+                      "remaining attempts",
+                      "error"_attr = redact(result.getStatus()));
+    }
 
     // Check if need to do more retries.
     if (!hasRetries) {

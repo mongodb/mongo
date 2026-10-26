@@ -786,6 +786,19 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.metrics.repl.initialSync.failures");
     static constexpr MetricName kInitialSyncCompleted =
         MetricNameMaker::make("mongodb.serverStatus.metrics.repl.initialSync.completed");
+    static constexpr MetricName kInitialSyncInitiatingSetRewindRewound = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.initialSync.initiatingSetRewind.rewound");
+    static constexpr MetricName kInitialSyncInitiatingSetRewindSkippedTooOld =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.repl.initialSync.initiatingSetRewind.skippedTooOld");
+    static constexpr MetricName kInitialSyncInitiatingSetRewindOldestEntryParseFailures =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.repl.initialSync.initiatingSetRewind."
+            "oldestEntryParseFailures");
+    static constexpr MetricName kInitialSyncInitiatingSetRewindDisabledAfterFailedAttempt =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.repl.initialSync.initiatingSetRewind."
+            "disabledAfterFailedAttempt");
     static constexpr MetricName kReplNetworkBytes =
         MetricNameMaker::make("mongodb.serverStatus.metrics.repl.network.bytes");
     static constexpr MetricName kReplNetworkBytesSent =

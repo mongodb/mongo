@@ -23,6 +23,19 @@ enum class InitialSyncKind { kLogical, kFCBIS };
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Outcomes of rewinding the beginFetchingTimestamp to the sync source's 'initiating set' oplog
+ * entry (see 'initialSyncFetchFromInitiatingSetEntry'), each counted under
+ * repl.initialSync.initiatingSetRewind.
+ */
+enum class InitiatingSetRewindOutcome {
+    kRewound,
+    kSkippedTooOld,
+    kOldestEntryParseFailure,
+    kDisabledAfterFailedAttempt,
+};
+void incrementInitiatingSetRewindMetric(InitiatingSetRewindOutcome outcome);
+
 void incrementInitialSyncFailedAttemptMetric(InitialSyncKind kind);
 void incrementInitialSyncFailureMetric(InitialSyncKind kind);
 void incrementInitialSyncCompleteMetric(InitialSyncKind kind);

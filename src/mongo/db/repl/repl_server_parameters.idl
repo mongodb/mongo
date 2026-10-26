@@ -52,6 +52,35 @@ server_parameters:
         default: 3
         redact: false
 
+    initialSyncFetchFromInitiatingSetEntry:
+        description: >-
+            If true, a node performing logical initial sync rewinds its beginFetchingTimestamp to
+            the sync source's 'initiating set' oplog entry when that entry is still the oldest entry
+            in the sync source's oplog. The fetched entries before the beginApplyingTimestamp are
+            written to this node's oplog but not applied. This makes the marker the first entry of
+            this node's oplog as well, which change streams rely on to prove that no history has
+            fallen off the oplog. Has no effect once the sync source's oplog has truncated, or when
+            the rewind would exceed 'initialSyncFetchFromInitiatingSetEntryMaxSecs'.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: initialSyncFetchFromInitiatingSetEntry
+        default: false
+        redact: false
+
+    initialSyncFetchFromInitiatingSetEntryMaxSecs:
+        description: >-
+            The largest gap, in seconds, between the sync source's 'initiating set' oplog entry and
+            the beginFetchingTimestamp for which 'initialSyncFetchFromInitiatingSetEntry' rewinds
+            the beginFetchingTimestamp. This bounds the additional oplog fetched from a replica set
+            whose oplog has not truncated yet but has been running for a long time.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: initialSyncFetchFromInitiatingSetEntryMaxSecs
+        default: 300
+        validator:
+            gte: 0
+        redact: false
+
     initialSyncOplogFetcherBatchSize:
         description: >-
             The batchSize to use for the find/getMore queries called by the OplogFetcher. If set

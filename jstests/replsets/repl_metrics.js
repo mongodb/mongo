@@ -66,7 +66,17 @@ const expectedReplSection = {
         "ops": 0,
     },
     "heartBeat": {"handleQueueSize": 0, "maxSeenHandleQueueSize": 0},
-    "initialSync": {"completed": 0, "failedAttempts": 0, "failures": 0},
+    "initialSync": {
+        "completed": 0,
+        "failedAttempts": 0,
+        "failures": 0,
+        "initiatingSetRewind": {
+            "rewound": 0,
+            "skippedTooOld": 0,
+            "oldestEntryParseFailures": 0,
+            "disabledAfterFailedAttempt": 0,
+        },
+    },
     "internodeConsistency": {"hashMismatch": {"insert": 0, "update": 0, "delete": 0}},
     "network": {
         "bytes": 0,

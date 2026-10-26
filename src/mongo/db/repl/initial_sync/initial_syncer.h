@@ -373,6 +373,18 @@ private:
      *   _getBeginFetchingOpTimeCallback()
      *         |
      *         |
+     *         V
+     *    _scheduleGetOldestOplogEntryForInitiatingSet()
+     *         |  (skipped if initialSyncFetchFromInitiatingSetEntry is false)
+     *         |
+     *         V
+     *    _handleOldestOplogEntryForInitiatingSetResponse()
+     *         |
+     *         |
+     *         V
+     *    _scheduleFastCountOrBeginApplyingTimestampFetcher()
+     *         |
+     *         |
      *         +--------------------------------------------------+
      *         |                                                  |
      *         |                                                  |
@@ -578,6 +590,37 @@ private:
                                          const OpTime& defaultBeginFetchingOpTime);
 
     /**
+     * Schedules a find for the oldest entry in the sync source's oplog and routes the response to
+     * _handleOldestOplogEntryForInitiatingSetResponse. Only used when
+     * 'initialSyncFetchFromInitiatingSetEntry' is enabled.
+     */
+    void _scheduleGetOldestOplogEntryForInitiatingSet(
+        WithLock lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
+     * If the sync source's oldest oplog entry is the 'initiating set' entry, its oplog has never
+     * been truncated, and 'beginFetchingOpTime' is rewound to that entry so that this node's oplog
+     * begins with it too. Only the fetch start moves; the beginApplyingTimestamp is unaffected.
+     * Then continues with _scheduleFastCountOrBeginApplyingTimestampFetcher().
+     */
+    void _handleOldestOplogEntryForInitiatingSetResponse(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
+     * Continues with the beginFetchingTimestamp determined so far, either by scanning for the
+     * replicated fast count validAsOf (when enabled) or by scheduling the beginApplyingTimestamp
+     * fetch directly.
+     */
+    void _scheduleFastCountOrBeginApplyingTimestampFetcher(
+        WithLock lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
      * Callback for second '_lastOplogEntryFetcher' callback. A successful response lets us
      * determine the starting point for applying oplog entries during the oplog application phase
      * as well as setting a reference point for the state of the sync source's oplog when data
@@ -682,7 +725,8 @@ private:
      */
     void _multiApplierCallback(const Status& status,
                                OpTimeAndWallTime lastApplied,
-                               std::uint32_t numApplied,
+                               std::uint32_t numOpsInBatch,
+                               std::uint32_t numOpsToApply,
                                std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -901,6 +945,7 @@ private:
     std::unique_ptr<InitialSyncState> _initialSyncState;         // (M)
     std::unique_ptr<OplogFetcher> _oplogFetcher;                 // (S)
     std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;        // (S)
+    std::unique_ptr<Fetcher> _oldestOplogEntryFetcher;           // (S)
     std::unique_ptr<Fetcher> _lastOplogEntryFetcher;             // (S)
     std::unique_ptr<Fetcher> _fastCountTimestampStoreFetcher;    // (S)
     std::unique_ptr<Fetcher> _fastCountOldestOplogEntryFetcher;  // (S)
@@ -942,6 +987,14 @@ private:
 
     // Current phase of initial sync.
     Phase _currentPhase;  // (M)
+
+    // Whether the current attempt rewound its beginFetchingTimestamp to the sync source's
+    // 'initiating set' entry.
+    bool _attemptRewoundToInitiatingSet = false;  // (M)
+
+    // Set when an attempt that rewound fails while handling the extra entries it fetched, so that
+    // the remaining attempts of this initial sync keep their original beginFetchingTimestamp.
+    bool _skipInitiatingSetRewind = false;  // (M)
 
     // Records {phase, entryTime} for each phase in the current attempt. (M)
     std::vector<std::pair<Phase, Date_t>> _phaseTransitions;  // (M)

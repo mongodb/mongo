@@ -66,9 +66,61 @@ Counter<int64_t, std::string_view>& initialSyncCompletes =
         AttributeDefinition<std::string_view>{.name = "kind", .values = initialSyncKindsVector},
         {.serverStatusOptions = ServerStatusOptions({.dottedPath = "repl.initialSync.completed"})});
 
+Counter<int64_t>& initiatingSetRewindRewound = MetricsService::instance().createInt64Counter(
+    MetricNames::kInitialSyncInitiatingSetRewindRewound,
+    "Number of initial sync attempts that rewound their beginFetchingTimestamp to the sync "
+    "source's 'initiating set' oplog entry.",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions({.dottedPath = "repl.initialSync.initiatingSetRewind.rewound"})});
+
+Counter<int64_t>& initiatingSetRewindSkippedTooOld = MetricsService::instance().createInt64Counter(
+    MetricNames::kInitialSyncInitiatingSetRewindSkippedTooOld,
+    "Number of initial sync attempts that did not rewind to the sync source's 'initiating set' "
+    "oplog entry because it was older than initialSyncFetchFromInitiatingSetEntryMaxSecs.",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions(
+         {.dottedPath = "repl.initialSync.initiatingSetRewind.skippedTooOld"})});
+
+Counter<int64_t>& initiatingSetRewindOldestEntryParseFailures =
+    MetricsService::instance().createInt64Counter(
+        MetricNames::kInitialSyncInitiatingSetRewindOldestEntryParseFailures,
+        "Number of initial sync attempts that could not parse the sync source's oldest oplog "
+        "entry while checking for the 'initiating set' entry.",
+        MetricUnit::kEvents,
+        {.serverStatusOptions = ServerStatusOptions(
+             {.dottedPath = "repl.initialSync.initiatingSetRewind.oldestEntryParseFailures"})});
+
+Counter<int64_t>& initiatingSetRewindDisabledAfterFailedAttempt =
+    MetricsService::instance().createInt64Counter(
+        MetricNames::kInitialSyncInitiatingSetRewindDisabledAfterFailedAttempt,
+        "Number of initial syncs that stopped rewinding to the 'initiating set' oplog entry after "
+        "an attempt that rewound failed while handling the additional oplog entries it fetched.",
+        MetricUnit::kEvents,
+        {.serverStatusOptions = ServerStatusOptions(
+             {.dottedPath = "repl.initialSync.initiatingSetRewind.disabledAfterFailedAttempt"})});
+
 size_t initialSyncFailedAttemptCount = 0;
 size_t initialSyncFailureCount = 0;
 size_t initialSyncCompleteCount = 0;
+
+void incrementInitiatingSetRewindMetric(InitiatingSetRewindOutcome outcome) {
+    switch (outcome) {
+        case InitiatingSetRewindOutcome::kRewound:
+            initiatingSetRewindRewound.add(1);
+            return;
+        case InitiatingSetRewindOutcome::kSkippedTooOld:
+            initiatingSetRewindSkippedTooOld.add(1);
+            return;
+        case InitiatingSetRewindOutcome::kOldestEntryParseFailure:
+            initiatingSetRewindOldestEntryParseFailures.add(1);
+            return;
+        case InitiatingSetRewindOutcome::kDisabledAfterFailedAttempt:
+            initiatingSetRewindDisabledAfterFailedAttempt.add(1);
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
 
 void incrementInitialSyncFailedAttemptMetric(InitialSyncKind kind) {
     initialSyncFailedAttempts.add(1, initialSyncKindToStringView(kind));

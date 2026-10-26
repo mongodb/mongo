@@ -202,9 +202,16 @@ assert(
     () => "Response should have an 'initialSyncStatus' field: " + tojson(res),
 );
 
-// It is possible that we update the config document after going through a reconfig. So make sure
-// we account for this.
-assert.gte(endOfCloningRes.initialSyncStatus.appliedOps, 3);
+// The two inserts above are applied. Fetching starts at the beginApplyingTimestamp entry, which is
+// written to the oplog but not applied; older binaries counted it in 'appliedOps' instead. It is
+// also possible that we update the config document after going through a reconfig, so these are
+// lower bounds.
+assert.gte(endOfCloningRes.initialSyncStatus.appliedOps, 2);
+assert.gte(
+    endOfCloningRes.initialSyncStatus.appliedOps +
+        (endOfCloningRes.initialSyncStatus.writtenNotAppliedOps ?? 0),
+    3,
+);
 
 // Assert metrics have progressed in the right direction since the last time we checked the metrics.
 assert.gt(

@@ -252,6 +252,7 @@ public:
      * last oplog entry fetcher. Also validates the find command arguments in the request.
      */
     void processSuccessfulLastOplogEntryFetcherResponse(std::vector<BSONObj> docs);
+    void processSuccessfulOldestOplogEntryFetcherResponse(std::vector<BSONObj> docs);
 
     /**
      * Responds to the find the initial syncer issues against the sync source's clean shutdown
@@ -528,6 +529,8 @@ protected:
         _storageInterface.reset();
         _mock.reset();
         enableInitialSyncCleanShutdownCheck.store(true);
+        // Restore the default after the tests that enable the 'initiating set' rewind.
+        initialSyncFetchFromInitiatingSetEntry = false;
     }
 
     /**
@@ -739,6 +742,36 @@ void InitialSyncerTest::processSuccessfulCleanShutdownResponse(boost::optional<B
     ASSERT_EQUALS(NamespaceString::kCleanShutdownLogNamespace.coll(),
                   request.cmdObj.firstElement().valueStringData());
     net->runReadyNetworkOperations();
+}
+
+void InitialSyncerTest::processSuccessfulOldestOplogEntryFetcherResponse(
+    std::vector<BSONObj> docs) {
+    auto net = getNet();
+    auto request =
+        assertRemoteCommandNameEquals("find",
+                                      net->scheduleSuccessfulResponse(makeCursorResponse(
+                                          0LL, NamespaceString::kRsOplogNamespace, docs)));
+    ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
+    ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));
+    // The find is bounded like the oplog fetcher's initial find.
+    ASSERT_EQUALS(oplogInitialFindMaxSeconds.load() * 1000,
+                  request.cmdObj.getIntField("maxTimeMS"));
+    ASSERT_EQUALS(
+        Seconds(oplogInitialFindMaxSeconds.load() + oplogNetworkTimeoutBufferSeconds.load()),
+        request.timeout);
+    net->runReadyNetworkOperations();
+}
+
+/**
+ * Generates the no-op oplog entry that replSetInitiate writes as the first entry of a new replica
+ * set's oplog.
+ */
+BSONObj makeInitiatingSetOplogEntryObj(int t) {
+    return BSON("ts" << Timestamp(t, 1) << "t" << 1LL << "v" << OplogEntry::kOplogVersion << "op"
+                     << "n"
+                     << "ns"
+                     << ""
+                     << "wall" << Date_t() + Seconds(t) << "o" << BSON("msg" << kInitiatingSetMsg));
 }
 
 void assertFCVRequest(RemoteCommandRequest request) {
@@ -1526,6 +1559,418 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBeginFetchingOpTimeFetcherOnShutdo
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerRewindsBeginFetchingOpTimeToInitiatingSetEntry) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    std::unique_ptr<otel::metrics::OtelMetricsCapturer> capturer;
+    if (otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        capturer = std::make_unique<otel::metrics::OtelMetricsCapturer>();
+    }
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The sync source's oplog still begins at the 'initiating set' entry.
+        processSuccessfulOldestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponseLastLTS();
+    }
+
+    // Fetching starts at the 'initiating set' entry, but applying still starts after the sync
+    // source's top of oplog.
+    ASSERT_EQUALS(OpTime(Timestamp(1, 1), 1),
+                  getInitialSyncer().getOplogFetcher_forTest()->getLastOpTimeFetched());
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_EQUALS(Timestamp(1, 1), progress["initialSyncOplogFetchingStart"].timestamp())
+        << progress;
+    ASSERT_EQUALS(Timestamp(3, 1), progress["initialSyncOplogStart"].timestamp()) << progress;
+
+    if (capturer) {
+        ASSERT_EQ(1,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::kInitialSyncInitiatingSetRewindRewound));
+        ASSERT_EQ(0,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::kInitialSyncInitiatingSetRewindSkippedTooOld));
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerRecordsExactAppliedAndWrittenNotAppliedOpsAfterInitiatingSetRewind) {
+    // Skip reconstructing prepared transactions at the end of initial sync because
+    // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
+    // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
+
+    // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
+    // initial sync is complete.
+    FailPointEnableBlock skipClearInitialSyncState("skipClearInitialSyncState");
+
+    initialSyncFetchFromInitiatingSetEntry = true;
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    int baseRollbackId = 1;
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(4)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The sync source's oplog still begins at the 'initiating set' entry, so fetching rewinds
+        // to it.
+        processSuccessfulOldestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(4)});
+
+        {
+            // Ensure the stopTimestamp fetch doesn't happen until we're ready for it.
+            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
+                                                 kListDatabasesFailPointData);
+
+            // Feature Compatibility Version.
+            processSuccessfulFCVFetcherResponseLastLTS();
+
+            // Entries at ts 1 (the 'initiating set' entry), 2, 3, and 4 are at or before the
+            // beginApplyingTimestamp (ts 4), so the batcher's forced boundary there keeps them in
+            // their own batch: they are written to the oplog but not applied. Entries at ts 5, 6,
+            // and 7 are after the beginApplyingTimestamp, so they land in the next batch and are
+            // applied.
+            getOplogFetcher()->receiveBatch(1LL,
+                                            {makeOplogEntryObj(1),
+                                             makeOplogEntryObj(2),
+                                             makeOplogEntryObj(3),
+                                             makeOplogEntryObj(4),
+                                             makeOplogEntryObj(5),
+                                             makeOplogEntryObj(6),
+                                             makeOplogEntryObj(7)});
+        }
+
+        // Oplog entry associated with the stopTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(7)});
+
+        // Last rollback ID, checked once the applier has caught up to the stopTimestamp.
+        assertRemoteCommandNameEquals(
+            "replSetGetRBID",
+            net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId)));
+        net->runReadyNetworkOperations();
+
+        // _multiApplierCallback() will cancel the _getNextApplierBatchCallback() task after setting
+        // the completion status. We call runReadyNetworkOperations() again to deliver the
+        // cancellation status to _oplogFetcherCallback().
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_OK(_lastApplied.getStatus());
+
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_EQUALS(Timestamp(1, 1), progress["initialSyncOplogFetchingStart"].timestamp())
+        << progress;
+    ASSERT_EQUALS(Timestamp(4, 1), progress["initialSyncOplogStart"].timestamp()) << progress;
+    ASSERT_EQUALS(Timestamp(7, 1), progress["initialSyncOplogEnd"].timestamp()) << progress;
+    // Entries at ts 1, 2, 3, and 4 (<= the beginApplyingTimestamp) were written to the oplog but
+    // not applied; entries at ts 5, 6, and 7 (> the beginApplyingTimestamp) were applied.
+    ASSERT_EQUALS(progress.getIntField("writtenNotAppliedOps"), 4) << progress;
+    ASSERT_EQUALS(progress.getIntField("appliedOps"), 3) << progress;
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerDoesNotRewindBeginFetchingOpTimeIfOldestEntryIsNotInitiatingSetEntry) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The sync source's oplog has truncated, so its oldest entry is an ordinary no-op.
+        processSuccessfulOldestOplogEntryFetcherResponse({makeOplogEntryObj(1, OpTypeEnum::kNoop)});
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponseLastLTS();
+    }
+
+    ASSERT_EQUALS(OpTime(Timestamp(3, 1), 1),
+                  getInitialSyncer().getOplogFetcher_forTest()->getLastOpTimeFetched());
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_FALSE(progress.hasField("initialSyncOplogFetchingStart")) << progress;
+    ASSERT_EQUALS(Timestamp(3, 1), progress["initialSyncOplogStart"].timestamp()) << progress;
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerDoesNotRewindBeginFetchingOpTimeIfOldestEntryCannotBeParsed) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    std::unique_ptr<otel::metrics::OtelMetricsCapturer> capturer;
+    if (otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        capturer = std::make_unique<otel::metrics::OtelMetricsCapturer>();
+    }
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The sync source's oldest oplog entry has no optime, so it cannot be parsed.
+        processSuccessfulOldestOplogEntryFetcherResponse(
+            {BSON("op" << "n" << "o" << BSON("msg" << kInitiatingSetMsg))});
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponseLastLTS();
+    }
+
+    ASSERT_EQUALS(OpTime(Timestamp(3, 1), 1),
+                  getInitialSyncer().getOplogFetcher_forTest()->getLastOpTimeFetched());
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_FALSE(progress.hasField("initialSyncOplogFetchingStart")) << progress;
+    ASSERT_EQUALS(Timestamp(3, 1), progress["initialSyncOplogStart"].timestamp()) << progress;
+
+    if (capturer) {
+        ASSERT_EQ(1,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::
+                          kInitialSyncInitiatingSetRewindOldestEntryParseFailures));
+        ASSERT_EQ(0,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::kInitialSyncInitiatingSetRewindRewound));
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerDoesNotRewindBeginFetchingOpTimeIfInitiatingSetEntryIsTooOld) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    std::unique_ptr<otel::metrics::OtelMetricsCapturer> capturer;
+    if (otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        capturer = std::make_unique<otel::metrics::OtelMetricsCapturer>();
+    }
+    const auto originalMaxSecs = initialSyncFetchFromInitiatingSetEntryMaxSecs;
+    ON_BLOCK_EXIT([&] { initialSyncFetchFromInitiatingSetEntryMaxSecs = originalMaxSecs; });
+    initialSyncFetchFromInitiatingSetEntryMaxSecs = 1;
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The 'initiating set' entry is 2 seconds older than the beginFetchingTimestamp.
+        processSuccessfulOldestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponseLastLTS();
+    }
+
+    ASSERT_EQUALS(OpTime(Timestamp(3, 1), 1),
+                  getInitialSyncer().getOplogFetcher_forTest()->getLastOpTimeFetched());
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_FALSE(progress.hasField("initialSyncOplogFetchingStart")) << progress;
+    ASSERT_EQUALS(Timestamp(3, 1), progress["initialSyncOplogStart"].timestamp()) << progress;
+
+    if (capturer) {
+        ASSERT_EQ(1,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::kInitialSyncInitiatingSetRewindSkippedTooOld));
+        ASSERT_EQ(0,
+                  capturer->readInt64Counter(
+                      otel::metrics::MetricNames::kInitialSyncInitiatingSetRewindRewound));
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOldestOplogEntryFetcherCallbackError) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // Fail the find for the sync source's oldest oplog entry.
+        request = net->scheduleErrorResponse(
+            Status(ErrorCodes::OperationFailed, "find command failed at sync source"));
+        assertRemoteCommandNameEquals("find", request);
+        ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerCancelsOldestOplogEntryFetcherOnShutdown) {
+    initialSyncFetchFromInitiatingSetEntry = true;
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
+
+        // No active transactions, so the beginFetchingTimestamp starts out as the
+        // defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // The find for the sync source's oldest oplog entry is left without a response.
+        ASSERT_TRUE(net->hasReadyRequests());
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherScheduleError) {
@@ -5000,7 +5445,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24168, "Progress after first failed response", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 15) << progress;
+        ASSERT_EQUALS(progress.nFields(), 16) << progress;
         ASSERT_EQUALS(progress.getField("method").String(), "logical") << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
@@ -5014,6 +5459,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
+        ASSERT_EQUALS(progress.getIntField("writtenNotAppliedOps"), 0) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
                           BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
@@ -5073,7 +5519,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24171, "Progress after failure", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 15) << progress;
+        ASSERT_EQUALS(progress.nFields(), 16) << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
@@ -5085,6 +5531,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
+        ASSERT_EQUALS(progress.getIntField("writtenNotAppliedOps"), 0) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
                           BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
@@ -5183,7 +5630,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24173, "Progress after all but last successful response", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 17) << progress;
+    ASSERT_EQUALS(progress.nFields(), 18) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), BSONType::numberInt)
@@ -5195,8 +5642,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
     ASSERT_EQUALS(progress.getIntField("remainingInitialSyncEstimatedMillis"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
-    // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
-    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
+    // The entry at the beginApplyingTimestamp (ts 1) is written to the oplog but not applied;
+    // entries Timestamp(2,1) ... Timestamp(7,1) are applied.
+    ASSERT_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
+    ASSERT_EQUALS(progress.getIntField("writtenNotAppliedOps"), 1) << progress;
     auto databasesProgress = progress.getObjectField("databases");
     ASSERT_EQUALS(1, databasesProgress.getIntField("databasesCloned")) << databasesProgress;
     ASSERT_EQUALS(0, databasesProgress.getIntField("databasesToClone")) << databasesProgress;
@@ -5289,7 +5738,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24175, "Progress at end", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 18) << progress;
+    ASSERT_EQUALS(progress.nFields(), 19) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
@@ -5306,8 +5755,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.getIntField("remainingInitialSyncEstimatedMillis"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 10) << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
-    // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
-    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
+    // The entry at the beginApplyingTimestamp (ts 1) is written to the oplog but not applied;
+    // entries Timestamp(2,1) ... Timestamp(7,1) are applied.
+    ASSERT_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
+    ASSERT_EQUALS(progress.getIntField("writtenNotAppliedOps"), 1) << progress;
     ASSERT_EQUALS(progress.getStringField("phase"),
                   InitialSyncer::phaseToString(InitialSyncer::Phase::kComplete))
         << progress;
