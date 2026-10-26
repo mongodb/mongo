@@ -134,6 +134,13 @@ private:
             getTLConnection().indicateFailure(std::move(s));
         }
 
+        void indicateFailure(Status s, ErrorCodes::Error cancellationCause) override {
+            if (cancellationCause == ErrorCodes::MaxTimeMSExpired) {
+                getTLConnection()._closeReason = ConnectionCloseReason::kMaxTimeMsExpired;
+            }
+            indicateFailure(std::move(s));
+        }
+
     private:
         connection_pool_tl::TLConnection& getTLConnection() {
             return *checked_cast<connection_pool_tl::TLConnection*>(_conn.get());

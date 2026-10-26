@@ -59,6 +59,12 @@ int64_t readEgressConnectionsCreatedCounterOrZero(
     }
 }
 
+int64_t readEgressConnectionsClosedCounter(otel::metrics::OtelMetricsCapturer& capturer,
+                                           std::string_view reason) {
+    return capturer.readInt64Counter(otel::metrics::MetricNames::kNetworkEgressConnectionsClosed,
+                                     std::tuple{reason});
+}
+
 class ConnectionPoolTest : public unittest::Test {
 public:
     constexpr static Milliseconds kNoTimeout = Milliseconds{-1};
@@ -474,6 +480,139 @@ TEST_F(ConnectionPoolMetricsTest, ConnectionStatsAreReportedCorrectly) {
     // And dropping the connection again should not change totalCreated.
     pool->dropConnections();
     ASSERT_EQ(getStats().totalCreated, numConnections + 1);
+}
+
+TEST_F(ConnectionPoolSetupTest, CloseReasonIsNotEstablishedBeforeSetup) {
+    PoolImpl factory(_executor);
+    ConnectionImpl conn(HostAndPort(), 0, 0, &factory);
+
+    ASSERT_EQ(conn._closeReason, ConnectionCloseReason::kNotEstablished);
+}
+
+TEST_F(ConnectionPoolSetupTest, CloseReasonSurvivesReuseAfterSuccessfulSetup) {
+    auto pool = makePool();
+    ConnectionPool::ConnectionHandle conn;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(HostAndPort(), Milliseconds(5000), [&](StatusWithConn swConn) {
+        ASSERT_OK(swConn.getStatus());
+        conn = std::move(swConn.getValue());
+    });
+
+    ASSERT(conn);
+    const auto id = getId(conn);
+    ASSERT_EQ(conn->_closeReason, ConnectionCloseReason::kOther);
+
+    conn->_closeReason = ConnectionCloseReason::kMaxTimeMsExpired;
+    doneWith(conn);
+
+    pool->get_forTest(HostAndPort(), Milliseconds(5000), [&](StatusWithConn swConn) {
+        ASSERT_OK(swConn.getStatus());
+        conn = std::move(swConn.getValue());
+    });
+
+    ASSERT(conn);
+    ASSERT_EQ(getId(conn), id);
+    ASSERT_EQ(conn->_closeReason, ConnectionCloseReason::kMaxTimeMsExpired);
+    doneWith(conn);
+}
+
+TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricExcludesFailedSetup) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto pool = makePool();
+    auto future = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(10));
+    ASSERT_FALSE(future.isReady());
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, "setup failed"));
+    ASSERT_TRUE(future.isReady());
+    ASSERT_NOT_OK(std::move(future).getNoThrow());
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 0);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonMaxTimeMsExpired), 0);
+}
+
+TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricCountsDiscardOnceNotReuse) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readOther = [&] {
+        return readEgressConnectionsClosedCounter(capturer, kCloseReasonOther);
+    };
+    auto pool = makePool();
+    ConnectionImpl::pushSetup(Status::OK());
+    auto conn = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1)).get();
+    const auto id = getId(conn);
+    doneWith(conn);
+    ASSERT_EQ(readOther(), 0);
+
+    auto reused =
+        std::move(getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1))).get();
+    ASSERT_EQ(getId(reused), id);
+    doneWithError(reused, Status(ErrorCodes::CallbackCanceled, "request canceled"));
+    ASSERT_EQ(readOther(), 1);
+
+    pool->dropConnections(HostAndPort());
+    ASSERT_EQ(readOther(), 1);
+}
+
+TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricCountsIdlePoolDrop) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto pool = makePool();
+    ConnectionImpl::pushSetup(Status::OK());
+    auto conn = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1)).get();
+    doneWith(conn);
+
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 0);
+    pool->dropConnections(HostAndPort());
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 1);
+}
+
+TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricRecordsMaxTimeMsExpiredReason) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto pool = makePool();
+    ConnectionImpl::pushSetup(Status::OK());
+    auto conn = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1)).get();
+    conn->_closeReason = ConnectionCloseReason::kMaxTimeMsExpired;
+    doneWithError(conn, Status(ErrorCodes::CallbackCanceled, "local deadline expired"));
+
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonMaxTimeMsExpired), 1);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 0);
+}
+
+TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricCountsLateSuccessfulSetup) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ConnectionPool::Options options;
+    options.minConnections = 3;
+    options.maxConnecting = 3;
+    auto pool = makePool(options);
+    auto future = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(10));
+    ASSERT_FALSE(future.isReady());
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, "setup failed"));
+    ASSERT_TRUE(future.isReady());
+    ASSERT_NOT_OK(std::move(future).getNoThrow());
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 0);
+
+    // These setup callbacks succeed, but the pool has already invalidated their generation.
+    ConnectionImpl::pushSetup(Status::OK());
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 2);
 }
 
 /**

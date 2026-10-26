@@ -481,6 +481,18 @@ void NetworkInterfaceTL::CommandStateBase::releaseClientHandle(Status status) {
     auto clientHandleToRelease = std::exchange(clientHandle, {});
 
     if (!status.isOK()) {
+        if (status == ErrorCodes::CallbackCanceled) {
+            bool canceledDueToMaxTimeMS;
+            {
+                std::lock_guard lock(cancelMutex);
+                canceledDueToMaxTimeMS = (cancelStatus == ErrorCodes::MaxTimeMSExpired);
+            }
+            if (canceledDueToMaxTimeMS) {
+                clientHandleToRelease->indicateFailure(std::move(status),
+                                                       ErrorCodes::MaxTimeMSExpired);
+                return;
+            }
+        }
         clientHandleToRelease->indicateFailure(std::move(status));
         return;
     }

@@ -368,6 +368,17 @@ public:
 };
 
 /**
+ * Context that tracks the reason a connection closed.
+ * `kNotEstablished` if the connection has not completed pool setup.
+ */
+enum class ConnectionCloseReason {
+    kNotEstablished,
+    kMaxTimeMsExpired,
+    kOther,
+};
+
+
+/**
  * Interface for connection pool connections
  *
  * Provides a minimal interface to manipulate connections within the pool,
@@ -462,6 +473,8 @@ public:
      * not be re-used).
      */
     size_t getGeneration() const;
+
+    ConnectionCloseReason _closeReason = ConnectionCloseReason::kNotEstablished;
 
 protected:
     /**
@@ -645,6 +658,11 @@ inline ClockSource* ConnectionPool::_getFastClockSource() const {
 [[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kShardingFixedConnectionPoolAttribute =
     "Sharding-Fixed";
 [[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kOtherConnectionPoolAttribute = "other";
+
+// Possible values for the "egress connections closed" metric attribute
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kCloseReasonMaxTimeMsExpired =
+    "maxTimeMsExpired";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kCloseReasonOther = "other";
 
 }  // namespace executor
 }  // namespace mongo

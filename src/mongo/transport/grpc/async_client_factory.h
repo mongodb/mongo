@@ -116,6 +116,7 @@ private:
             _outcome = Status::OK();
         }
 
+        using AsyncClientFactory::AsyncClientHandle::indicateFailure;
         void indicateFailure(Status s) override {
             _outcome = std::move(s);
         }

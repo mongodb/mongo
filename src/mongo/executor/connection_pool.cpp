@@ -81,6 +81,33 @@ auto& egressConnectionsCreatedCounter =
                 .serverStatusOptions = otel::metrics::ServerStatusOptions{
                     .dottedPath = "network.egress.connectionsCreated", .role = ClusterRole::None}});
 
+auto& egressConnectionsClosedCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kNetworkEgressConnectionsClosed,
+        "Cumulative count of egress connections closed by closure reason",
+        otel::metrics::MetricUnit::kConnections,
+        otel::metrics::AttributeDefinition<std::string_view>{
+            .name = "reason",
+            .values = {kCloseReasonMaxTimeMsExpired, kCloseReasonOther},
+        },
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "network.egress.connectionsClosed",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
+std::string_view connectionCloseReasonToAttributeValue(ConnectionCloseReason reason) {
+    switch (reason) {
+        case ConnectionCloseReason::kMaxTimeMsExpired:
+            return kCloseReasonMaxTimeMsExpired;
+        case ConnectionCloseReason::kOther:
+            return kCloseReasonOther;
+        case ConnectionCloseReason::kNotEstablished:
+            MONGO_UNREACHABLE;
+    }
+    MONGO_UNREACHABLE;
+}
+
 std::string_view connectionAcquisitionPurposeToAttributeValue(
     executor::ConnectionAcquisitionPurpose purpose) {
     switch (purpose) {
@@ -566,6 +593,10 @@ private:
             ConnWrap(OwnedConnection conn, std::weak_ptr<SpecificPool> owner)
                 : conn{std::move(conn)}, owner{std::move(owner)} {}
             ~ConnWrap() {
+                if (conn->_closeReason != ConnectionCloseReason::kNotEstablished) {
+                    egressConnectionsClosedCounter.add(
+                        1, {connectionCloseReasonToAttributeValue(conn->_closeReason)});
+                }
                 if (conn->getTimesUsed() == 0) {
                     if (auto ownerSp = owner.lock())
                         ownerSp->_neverUsed.fetchAndAddRelaxed(1);
@@ -1239,6 +1270,12 @@ void ConnectionPool::SpecificPool::finishRefresh(std::unique_lock<ObservableMute
     // We increment the total number of refreshed connections right upfront to track all completed
     // refreshes.
     _refreshed++;
+
+    // A completed setup counts as established even if the pool is shutting down or has since
+    // invalidated this connection's generation. Refreshes must not reset the closure reason.
+    if (conn && onSetup && status.isOK()) {
+        conn->_closeReason = ConnectionCloseReason::kOther;
+    }
 
     // If we're in shutdown, we don't need refreshed connections
     if (_state == ConnectionPoolState::kShutdown) {

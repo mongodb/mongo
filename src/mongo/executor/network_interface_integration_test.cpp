@@ -34,6 +34,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
@@ -66,6 +68,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -652,6 +655,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 // Test that the local timeout buffer (maxTimeMsLocalBufferTimeMillis) causes the local timer
 // to fire later than the nominal deadline.
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExtendsDeadline) {
+    otel::metrics::OtelMetricsCapturer capturer;
     constexpr auto bufferMs = Milliseconds{500};
     const unittest::ServerParameterGuard bufferServerParameterRAII{"maxTimeMsLocalBufferTimeMillis",
                                                                    bufferMs.count()};
@@ -685,6 +689,13 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExt
     const auto current_time = now();
     ASSERT_GTE(current_time, request.deadline + bufferMs);
     ASSERT_LT(request.deadline, expirationTime);
+
+    if (!unittest::shouldUseGRPCEgress() && capturer.canReadMetrics()) {
+        ASSERT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kNetworkEgressConnectionsClosed,
+                                      std::tuple{kCloseReasonMaxTimeMsExpired}),
+            1);
+    }
 }
 
 // Tests that the numRequestsTimedOutBeforeSentToRemote metric is incremented when a

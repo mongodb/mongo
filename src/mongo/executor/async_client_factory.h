@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/async_client.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
@@ -11,6 +12,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
+
+#include <utility>
 
 namespace mongo::executor {
 
@@ -51,6 +54,14 @@ public:
          * indicateSuccess() before destructing this handle.
          */
         virtual void indicateFailure(Status s) = 0;
+
+        /**
+         * Like indicateFailure(), but also supplies the cause of a canceled request for connection
+         * close metrics. Implementations without a connection pool may ignore the cause.
+         */
+        virtual void indicateFailure(Status s, ErrorCodes::Error) {
+            indicateFailure(std::move(s));
+        }
 
         /**
          * This method updates a 'liveness' timestamp on the client handle.
