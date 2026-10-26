@@ -21,6 +21,7 @@ primary.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]}, 
 const conn = new Mongo(rs.getURL());
 assert(conn.getDB("admin").auth("admin", "pwd"));
 assert.commandWorked(conn.getDB("admin").foo.insert({a: 1}, {writeConcern: {w: NODE_COUNT}}));
+rs.awaitReplication();
 
 // Make sure there is no primary
 rs.stop(0);
