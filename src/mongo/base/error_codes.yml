@@ -1391,5 +1391,12 @@ error_codes:
       categories: [ExtensionError],
     }
 
+  - {
+      code: 532,
+      name: PrepareConflict,
+      categories: [InternalOnly],
+      extra: PrepareConflictInfo,
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

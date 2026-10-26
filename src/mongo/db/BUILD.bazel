@@ -1508,6 +1508,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:optime",
+        "//src/mongo/db/storage:prepare_conflict_info",
         "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/rpc:get_status_from_command_result",
