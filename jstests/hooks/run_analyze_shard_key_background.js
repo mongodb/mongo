@@ -27,7 +27,10 @@ function getRandomCollection() {
     }).databases;
     if (dbInfos.length > 0) {
         const dbInfo = AnalyzeShardKeyUtil.getRandomElement(dbInfos);
-        const collInfos = conn.getDB(dbInfo.name).getCollectionInfos({type: "collection"});
+        const collInfos = conn.getDB(dbInfo.name).getCollectionInfos({
+            type: "collection",
+            name: {$not: /^system\./},
+        });
 
         if (collInfos.length > 0) {
             const collInfo = AnalyzeShardKeyUtil.getRandomElement(collInfos);
