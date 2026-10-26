@@ -10,6 +10,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
+#include <array>
 #include <string>
 
 #include <wiredtiger.h>
@@ -21,6 +22,20 @@
 
 namespace mongo {
 using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
+
+static int getIgnorePrepareConfig(PrepareConflictBehavior behavior) {
+    switch (behavior) {
+        case PrepareConflictBehavior::kEnforce:
+            return 0;
+        case PrepareConflictBehavior::kIgnoreConflicts:
+            return 1;
+        case PrepareConflictBehavior::kIgnoreConflictsAllowWrites:
+            return 2;
+        case PrepareConflictBehavior::kMax:
+            MONGO_UNREACHABLE;
+    }
+    MONGO_UNREACHABLE;
+}
 
 static inline int getConfigOffset(int ignore_prepare,
                                   int roundup_prepared,
@@ -37,10 +52,9 @@ static inline int getConfigOffset(int ignore_prepare,
 
 static std::vector<CompiledConfiguration>& makeCompiledConfigurations() {
     static std::vector<CompiledConfiguration> compiledConfigurations;
-    std::string ignore_prepare_str[] = {"false", "true", "force"};
+    std::array<std::string, 3> ignore_prepare_str = {"false", "true", "force"};
     std::string false_true_str[] = {"false", "true"};
-    for (int ignore_prepare = static_cast<int>(PrepareConflictBehavior::kEnforce);
-         ignore_prepare < static_cast<int>(PrepareConflictBehavior::kMax);
+    for (int ignore_prepare = 0; ignore_prepare < static_cast<int>(ignore_prepare_str.size());
          ignore_prepare++)
         for (int roundup_prepared = static_cast<int>(RoundUpPreparedTimestamps::kNoRound);
              roundup_prepared < static_cast<int>(RoundUpPreparedTimestamps::kMax);
@@ -88,7 +102,7 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         no_timestamp = NoReadTimestamp::kTrue;
     }
 
-    int config = getConfigOffset(static_cast<int>(prepareConflictBehavior),
+    int config = getConfigOffset(getIgnorePrepareConfig(prepareConflictBehavior),
                                  static_cast<int>(roundUpPreparedTimestamps
                                                       ? RoundUpPreparedTimestamps::kRound
                                                       : RoundUpPreparedTimestamps::kNoRound),

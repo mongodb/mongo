@@ -92,8 +92,8 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         // not ignoring prepare conflicts, then this definitely indicates an error.
         std::vector<IndexKeyDatum>::iterator keyDataIt;
         if (member->getState() == WorkingSetMember::RID_AND_IDX &&
-            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
-                PrepareConflictBehavior::kEnforce &&
+            !ignoresPrepareConflicts(
+                shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior()) &&
             (keyDataIt = std::find_if(
                  member->keyData.begin(),
                  member->keyData.end(),

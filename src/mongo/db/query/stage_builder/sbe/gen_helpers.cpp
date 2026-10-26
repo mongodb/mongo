@@ -114,8 +114,8 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
                                      const RecordId& rid,
                                      const NamespaceString& nss) {
     // Having a recordId but no record is only an issue when we are not ignoring prepare conflicts.
-    if (shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
-        PrepareConflictBehavior::kEnforce) {
+    if (!ignoresPrepareConflicts(
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior())) {
         tassert(5113700, "Should have snapshot id accessor", snapshotIdAccessor);
         auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
         auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();

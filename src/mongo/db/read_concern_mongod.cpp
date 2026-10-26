@@ -280,8 +280,8 @@ void setPrepareConflictBehaviorForReadConcernImpl(OperationContext* opCtx,
     }
 
     // Enforce prepare conflict behavior if the command is not eligible to ignore prepare conflicts.
-    if (!(prepareConflictBehavior == PrepareConflictBehavior::kEnforce ||
-          canIgnorePrepareConflicts(opCtx, readConcernArgs))) {
+    if (ignoresPrepareConflicts(prepareConflictBehavior) &&
+        !canIgnorePrepareConflicts(opCtx, readConcernArgs)) {
         prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
     }
 

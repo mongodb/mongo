@@ -73,6 +73,12 @@ public:
     DummyInterruptible interruptible;
 };
 
+TEST_F(WiredTigerPrepareConflictTest, IgnoreBehaviorClassification) {
+    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::kEnforce));
+    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflicts));
+    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflictsAllowWrites));
+}
+
 TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
     auto successOnFirstTry = []() {
         return 0;

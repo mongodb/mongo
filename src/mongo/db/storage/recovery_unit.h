@@ -66,6 +66,19 @@ enum class PrepareConflictBehavior {
     kMax,
 };
 
+inline bool ignoresPrepareConflicts(PrepareConflictBehavior behavior) {
+    switch (behavior) {
+        case PrepareConflictBehavior::kEnforce:
+            return false;
+        case PrepareConflictBehavior::kIgnoreConflicts:
+        case PrepareConflictBehavior::kIgnoreConflictsAllowWrites:
+            return true;
+        case PrepareConflictBehavior::kMax:
+            MONGO_UNREACHABLE;
+    }
+    MONGO_UNREACHABLE;
+}
+
 /**
  * DataCorruptionDetectionMode determines how we handle the discovery of evidence of data
  * corruption.

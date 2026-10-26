@@ -68,8 +68,8 @@ void logRecordNotFound(OperationContext* opCtx,
     // (race between document deletion & fetch). If we're ignoring prepare conflicts, then we
     // simply return here. Otherwise, we return an error and write to the log with instructions
     // on how to address potentially inconsistent data.
-    if (shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() !=
-        PrepareConflictBehavior::kEnforce) {
+    if (ignoresPrepareConflicts(
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior())) {
         return;
     }
 
