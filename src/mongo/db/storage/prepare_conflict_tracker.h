@@ -23,6 +23,11 @@ public:
     bool isWaitingOnPrepareConflict() const;
 
     /**
+     * Records that a prepare conflict was encountered, without marking the operation as waiting.
+     */
+    void recordPrepareConflict();
+
+    /**
      * Marks the start of a prepare conflict. Call updatePrepareConflict() to advance waiting
      * metrics during a conflict, and endPrepareConflict() to mark a prepare conflict as resolved.
      */

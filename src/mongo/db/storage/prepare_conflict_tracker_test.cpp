@@ -38,6 +38,28 @@ protected:
     PrepareConflictTracker* _pct = nullptr;
 };
 
+TEST_F(PrepareConflictTrackerTest, RecordConflictWithoutWaiting) {
+    for (int i = 1; i <= 2; ++i) {
+        _pct->recordPrepareConflict();
+        _tickSource->advance(Milliseconds(1000));
+        EXPECT_EQ(_pct->getThisOpPrepareConflictCount(), i);
+        EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), i);
+        EXPECT_FALSE(_pct->isWaitingOnPrepareConflict());
+        EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), Microseconds(0));
+        EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(), 0);
+    }
+
+    // A subsequent blocking conflict is counted once and times only the actual wait.
+    _pct->beginPrepareConflict(*_tickSource);
+    _tickSource->advance(Milliseconds(10));
+    _pct->endPrepareConflict(*_tickSource);
+    EXPECT_EQ(_pct->getThisOpPrepareConflictCount(), 3);
+    EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), 3);
+    EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(10));
+    EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(), 10000);
+    EXPECT_FALSE(_pct->isWaitingOnPrepareConflict());
+}
+
 // Tests that normal operations give expected behavior.
 TEST_F(PrepareConflictTrackerTest, BeginAndEndPrepareConflict) {
     _pct->beginPrepareConflict(*_tickSource);

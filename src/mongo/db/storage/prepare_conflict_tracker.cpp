@@ -19,11 +19,15 @@ bool PrepareConflictTracker::isWaitingOnPrepareConflict() const {
     return _waitingOnPrepareConflict.load();
 }
 
+void PrepareConflictTracker::recordPrepareConflict() {
+    prepareConflicts.increment();
+    _numPrepareConflictsThisOp.fetchAndAddRelaxed(1);
+}
+
 void PrepareConflictTracker::beginPrepareConflict(TickSource& tickSource) {
     invariant(!_waitingOnPrepareConflict.load());
     _waitingOnPrepareConflict.store(true);
-    prepareConflicts.increment();
-    _numPrepareConflictsThisOp.fetchAndAddRelaxed(1);
+    recordPrepareConflict();
     _prepareConflictLastUpdateTime = tickSource.getTicks();
 }
 
