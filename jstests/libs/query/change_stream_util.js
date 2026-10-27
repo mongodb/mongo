@@ -1574,6 +1574,24 @@ export function withBalancerEnabled(conn, cb) {
 }
 
 /**
+ * Starts a session on 'conn', runs the callback with the started session, and always ends the
+ * session afterwards. Returns the value returned by the callback.
+ *
+ * @param {Mongo} conn - The connection on which to start the session.
+ * @param {Function} cb - Callback invoked with the started session; its return value is returned
+ *     by this function.
+ * @returns {*} - The value returned by 'cb'.
+ */
+export function withSession(conn, cb) {
+    const session = conn.startSession();
+    try {
+        return cb(session);
+    } finally {
+        session.endSession();
+    }
+}
+
+/**
  * Helper function to add a new ReplSetTest shard into the cluster.
  */
 export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {

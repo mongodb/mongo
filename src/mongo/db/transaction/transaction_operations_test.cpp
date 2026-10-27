@@ -9,6 +9,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -856,6 +857,247 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     auto numEntries = ops.logOplogEntries(
         oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOpsFn, &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
+}
+
+TEST(TransactionOperationsTest,
+     LogOplogEntriesMarksFinalEntryOfSingleApplyOpsUnpreparedTransaction) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard featureFlagGuard(
+        "featureFlagEndOfTransactionChangeEventSynthesis", true);
+    ASSERT_TRUE(isEndOfTransactionWritePathEnabled());
+
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kInsert);
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op.setObject(BSON("_id" << 1 << "x" << 1));
+    ASSERT_OK(ops.addOperation(op));
+
+    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+
+    std::vector<OplogSlot> oplogSlots{OplogSlot{Timestamp(1, 0), /*term=*/1LL}};
+
+    auto logApplyOpsFn = [op](repl::MutableOplogEntry* entry,
+                              bool firstOp,
+                              bool lastOp,
+                              std::vector<StmtId>,
+                              WriteUnitOfWork::OplogEntryGroupType) {
+        ASSERT(firstOp);
+        ASSERT(lastOp);
+        ASSERT_BSONOBJ_EQ(
+            entry->getObject(),
+            BSON("applyOps" << BSON_ARRAY(op.toBSON()) << "allowEndOfTransaction" << true));
+        return repl::OpTime();
+    };
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::noGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite,
+                                          isEndOfTransactionWritePathEnabled());
+    ASSERT_EQ(numEntries, 1U);
+}
+
+TEST(TransactionOperationsTest,
+     LogOplogEntriesMarksOnlyFinalEntryOfMultiApplyOpsUnpreparedTransaction) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard featureFlagGuard(
+        "featureFlagEndOfTransactionChangeEventSynthesis", true);
+    ASSERT_TRUE(isEndOfTransactionWritePathEnabled());
+
+    TransactionOperations ops;
+
+    for (int i = 1; i <= 3; ++i) {
+        TransactionOperations::TransactionOperation op;
+        op.setOpType(repl::OpTypeEnum::kInsert);
+        op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+        op.setObject(BSON("_id" << i << "x" << i));
+        ASSERT_OK(ops.addOperation(op));
+    }
+
+    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+
+    std::vector<OplogSlot> oplogSlots{OplogSlot{Timestamp(1, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(2, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(3, 0), /*term=*/1LL}};
+
+    std::size_t numEntriesLogged = 0;
+    auto logApplyOpsFn = [&numEntriesLogged](repl::MutableOplogEntry* entry,
+                                             bool firstOp,
+                                             bool lastOp,
+                                             std::vector<StmtId>,
+                                             WriteUnitOfWork::OplogEntryGroupType) {
+        const auto obj = entry->getObject();
+        if (lastOp) {
+            ASSERT_FALSE(firstOp);
+            ASSERT_TRUE(obj.hasField("allowEndOfTransaction")) << obj;
+            ASSERT_TRUE(obj.getBoolField("allowEndOfTransaction")) << obj;
+        } else {
+            ASSERT_FALSE(obj.hasField("allowEndOfTransaction")) << obj;
+        }
+        ++numEntriesLogged;
+        return repl::OpTime();
+    };
+
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::noGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite,
+                                          isEndOfTransactionWritePathEnabled());
+    ASSERT_EQ(numEntries, 3U);
+    ASSERT_EQ(numEntriesLogged, 3U);
+}
+
+TEST(TransactionOperationsTest, LogOplogEntriesDoesNotMarkWhenParameterDisabled) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", false);
+    unittest::ServerParameterGuard featureFlagGuard(
+        "featureFlagEndOfTransactionChangeEventSynthesis", true);
+    ASSERT_FALSE(isEndOfTransactionWritePathEnabled());
+
+    TransactionOperations ops;
+
+    for (int i = 1; i <= 3; ++i) {
+        TransactionOperations::TransactionOperation op;
+        op.setOpType(repl::OpTypeEnum::kInsert);
+        op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+        op.setObject(BSON("_id" << i << "x" << i));
+        ASSERT_OK(ops.addOperation(op));
+    }
+
+    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+
+    std::vector<OplogSlot> oplogSlots{OplogSlot{Timestamp(1, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(2, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(3, 0), /*term=*/1LL}};
+
+    std::size_t numEntriesLogged = 0;
+    auto logApplyOpsFn = [&numEntriesLogged](repl::MutableOplogEntry* entry,
+                                             bool,
+                                             bool,
+                                             std::vector<StmtId>,
+                                             WriteUnitOfWork::OplogEntryGroupType) {
+        ASSERT_FALSE(entry->getObject().hasField("allowEndOfTransaction")) << entry->getObject();
+        ++numEntriesLogged;
+        return repl::OpTime();
+    };
+
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::noGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite,
+                                          isEndOfTransactionWritePathEnabled());
+    ASSERT_EQ(numEntries, 3U);
+    ASSERT_EQ(numEntriesLogged, 3U);
+}
+
+TEST(TransactionOperationsTest, LogOplogEntriesDoesNotMarkWhenFeatureFlagDisabled) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard featureFlagGuard(
+        "featureFlagEndOfTransactionChangeEventSynthesis", false);
+    ASSERT_FALSE(isEndOfTransactionWritePathEnabled());
+
+    TransactionOperations ops;
+
+    for (int i = 1; i <= 3; ++i) {
+        TransactionOperations::TransactionOperation op;
+        op.setOpType(repl::OpTypeEnum::kInsert);
+        op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+        op.setObject(BSON("_id" << i << "x" << i));
+        ASSERT_OK(ops.addOperation(op));
+    }
+
+    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+
+    std::vector<OplogSlot> oplogSlots{OplogSlot{Timestamp(1, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(2, 0), /*term=*/1LL},
+                                      OplogSlot{Timestamp(3, 0), /*term=*/1LL}};
+
+    std::size_t numEntriesLogged = 0;
+    auto logApplyOpsFn = [&numEntriesLogged](repl::MutableOplogEntry* entry,
+                                             bool,
+                                             bool,
+                                             std::vector<StmtId>,
+                                             WriteUnitOfWork::OplogEntryGroupType) {
+        ASSERT_FALSE(entry->getObject().hasField("allowEndOfTransaction")) << entry->getObject();
+        ++numEntriesLogged;
+        return repl::OpTime();
+    };
+
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::noGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite,
+                                          isEndOfTransactionWritePathEnabled());
+    ASSERT_EQ(numEntries, 3U);
+    ASSERT_EQ(numEntriesLogged, 3U);
+}
+
+TEST(TransactionOperationsTest, LogOplogEntriesDoesNotMarkPreparedTransaction) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard featureFlagGuard(
+        "featureFlagEndOfTransactionChangeEventSynthesis", true);
+    ASSERT_TRUE(isEndOfTransactionWritePathEnabled());
+
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kInsert);
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op.setObject(BSON("_id" << 1 << "x" << 1));
+    ASSERT_OK(ops.addOperation(op));
+
+    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/true);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+
+    std::vector<OplogSlot> oplogSlots{OplogSlot{Timestamp(1, 0), /*term=*/1LL}};
+
+    auto logApplyOpsFn = [](repl::MutableOplogEntry* entry,
+                            bool,
+                            bool,
+                            std::vector<StmtId>,
+                            WriteUnitOfWork::OplogEntryGroupType) {
+        ASSERT_FALSE(entry->getObject().hasField("allowEndOfTransaction"));
+        return repl::OpTime();
+    };
+
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+
+    // A prepared transaction must not carry the marker even if the caller requests it; the marker
+    // is reserved for the final applyOps entry of an unprepared transaction.
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::noGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite,
+                                          isEndOfTransactionWritePathEnabled());
+    ASSERT_EQ(numEntries, 1U);
 }
 
 TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransaction) {

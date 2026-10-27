@@ -135,6 +135,7 @@ mongo_cc_library(
         ":batched_write_context",
         ":op_observer",
         ":op_observer_util",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:import_collection_oplog_entry",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:multitenancy",

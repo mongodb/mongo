@@ -2476,6 +2476,7 @@ mongo_cc_unit_test(
         ":storage_interface_impl",
         ":timestamp_block",
         "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/index_builds:index_build_entry_helpers",
         "//src/mongo/db/index_builds:index_build_test_helpers",

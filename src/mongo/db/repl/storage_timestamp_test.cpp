@@ -16,6 +16,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/global_settings.h"
@@ -110,6 +111,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -206,6 +208,19 @@ public:
 private:
     OperationContext* _opCtx;
 };
+
+// Returns 'applyOpsObj' with 'allowEndOfTransaction: true' appended when the end-of-transaction
+// write path is enabled (feature flag and server parameter). Used to build the expected final
+// applyOps object for the tested gating combinations.
+BSONObj withEndOfTransactionMarker(const BSONObj& applyOpsObj) {
+    if (!isEndOfTransactionWritePathEnabled()) {
+        return applyOpsObj;
+    }
+    BSONObjBuilder builder;
+    builder.appendElements(applyOpsObj);
+    builder.append("allowEndOfTransaction", true);
+    return builder.obj();
+}
 }  // namespace
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
@@ -4350,7 +4365,22 @@ private:
     int _prevPackingLimit;
 };
 
-TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
+// Parameterized variant of MultiDocumentTransactionTest that runs the multi-oplog-entry
+// transaction test with the 'allowEndOfTransaction' server parameter both enabled and disabled. The
+// 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag is enabled throughout, because the
+// write path requires it in addition to the parameter.
+class MultiDocumentTransactionEndOfTransactionTest : public MultiDocumentTransactionTest,
+                                                     public testing::WithParamInterface<bool> {
+private:
+    // The write path requires the feature flag in addition to the parameter, so it is enabled for
+    // the whole test while the parameter is varied.
+    unittest::ServerParameterGuard _featureFlagGuard{
+        "featureFlagEndOfTransactionChangeEventSynthesis", true};
+};
+
+TEST_P(MultiDocumentTransactionEndOfTransactionTest, MultiOplogEntryTransaction) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     MultiOplogScopedSettings multiOplogSettings;
 
     const auto currentTime = _clock->getTime();
@@ -4398,11 +4428,12 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
         // Implicit commit oplog entry should exist at commitEntryTs.
         const auto commitFilter =
             BSON("ts" << commitEntryTs << "o"
-                      << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
-                                                                 << "ns" << nss.ns_forTest() << "ui"
-                                                                 << collAcq.uuid() << "o" << doc2
-                                                                 << "o2" << doc2Key))
-                                         << "count" << 2));
+                      << withEndOfTransactionMarker(BSON(
+                             "applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                                << "ns" << nss.ns_forTest() << "ui"
+                                                                << collAcq.uuid() << "o" << doc2
+                                                                << "o2" << doc2Key))
+                                        << "count" << 2)));
         assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -4451,6 +4482,10 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
         ASSERT_FALSE(sessionInfo.hasField("startOpTime"));
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(AllowEndOfTransaction,
+                         MultiDocumentTransactionEndOfTransactionTest,
+                         testing::Bool());
 
 TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
     MultiOplogScopedSettings multiOplogSettings;

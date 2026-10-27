@@ -255,14 +255,21 @@ public:
      * A null 'prePostImageToWriteToImageCollection' means the caller does not persist retryable
      * findAndModify images, so pre/post image extraction is skipped. See
      * packTransactionStatementsForApplyOps().
+     *
+     * When 'allowEndOfTransaction' is true, the final applyOps entry is marked with
+     * 'allowEndOfTransaction: true'. This is used for unprepared multi-document transactions to
+     * let a change stream distinguish transactions committed while end-of-transaction support was
+     * enabled from those committed while it was disabled. Callers for batched writes and prepared
+     * transactions leave it false.
      */
-    std::size_t logOplogEntries(const std::vector<OplogSlot>& oplogSlots,
-                                const ApplyOpsInfo& applyOpsOperationAssignment,
-                                Date_t wallClockTime,
-                                WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
-                                LogApplyOpsFn logApplyOpsFn,
-                                boost::optional<TransactionOperation::ImageBundle>*
-                                    prePostImageToWriteToImageCollection) const;
+    std::size_t logOplogEntries(
+        const std::vector<OplogSlot>& oplogSlots,
+        const ApplyOpsInfo& applyOpsOperationAssignment,
+        Date_t wallClockTime,
+        WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+        LogApplyOpsFn logApplyOpsFn,
+        boost::optional<TransactionOperation::ImageBundle>* prePostImageToWriteToImageCollection,
+        bool allowEndOfTransaction = false) const;
 
     /**
      * Returns const reference to vector of operations for integrating with

@@ -2147,6 +2147,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
+        ":server_feature_flags",
     ],
 )
 

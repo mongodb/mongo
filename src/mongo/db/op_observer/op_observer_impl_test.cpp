@@ -19,6 +19,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
@@ -179,6 +180,19 @@ void beginRetryableInternalTransactionWithTxnNumber(
                                    {*opCtx->getTxnNumber()},
                                    /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
+}
+
+// Returns 'applyOpsObj' with 'allowEndOfTransaction: true' appended when the end-of-transaction
+// write path is enabled (feature flag and server parameter). Tests use this to build the expected
+// final applyOps object for the tested gating combinations.
+BSONObj withEndOfTransactionMarker(const BSONObj& applyOpsObj) {
+    if (!isEndOfTransactionWritePathEnabled()) {
+        return applyOpsObj;
+    }
+    BSONObjBuilder builder;
+    builder.appendElements(applyOpsObj);
+    builder.append("allowEndOfTransaction", true);
+    return builder.obj();
 }
 
 template <typename OpObserverType>
@@ -3261,7 +3275,22 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     assertTxnRecord(txnNum(), commitOpTime, DurableTxnStateEnum::kCommitted);
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
+// Parameterized variant of OpObserverTransactionTest that runs the transactional op-observer
+// tests with the 'allowEndOfTransaction' server parameter both enabled and disabled. The
+// 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag is enabled throughout, because the
+// write path requires it in addition to the parameter.
+class OpObserverTransactionEndOfTransactionTest : public OpObserverTransactionTest,
+                                                  public testing::WithParamInterface<bool> {
+private:
+    // The write path requires the feature flag in addition to the parameter, so it is enabled for
+    // the whole test while the parameter is varied.
+    unittest::ServerParameterGuard _featureFlagGuard{
+        "featureFlagEndOfTransactionChangeEventSynthesis", true};
+};
+
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalInsertTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -3325,12 +3354,13 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
                               << BSON("_id" << 3 << "data"
                                             << "w")
                               << "o2" << BSON("_id" << 3))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
     ASSERT(!oplogEntry.shouldPrepare());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalInsertTestIncludesTenantId) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
     unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
@@ -3404,7 +3434,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
                                               << BSON("_id" << 3 << "data"
                                                             << "w")
                                               << "o2" << BSON("_id" << 3))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
 
     // This test assumes that the top level tenantId matches the tenantId in the first entry
     ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
@@ -3412,7 +3442,9 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalUpdateTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
@@ -3456,12 +3488,13 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
                  << BSON("op" << "u"
                               << "ns" << nss2.toString_forTest() << "ui" << uuid2 << "o"
                               << BSON("$set" << BSON("data" << "y")) << "o2" << BSON("_id" << 1))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalUpdateTestIncludesTenantId) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
     unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
@@ -3514,7 +3547,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
                               << "tid" << nss2.tenantId().value() << "ns" << nss2.toString_forTest()
                               << "ui" << uuid2 << "o" << BSON("$set" << BSON("data" << "y")) << "o2"
                               << BSON("_id" << 1))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
 
     // This test assumes that the top level tenantId matches the tenantId in the first entry
     ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
@@ -3522,7 +3555,9 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalDeleteTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
 
@@ -3553,12 +3588,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                       << BSON("op" << "d"
                                                    << "ns" << nss2.toString_forTest() << "ui"
                                                    << uuid2 << "o" << BSON("_id" << 1))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
+TEST_P(OpObserverTransactionEndOfTransactionTest, TransactionalDeleteTestIncludesTenantId) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
     unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
@@ -3597,13 +3633,17 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
                  << BSON("op" << "d"
                               << "tid" << nss2.tenantId().value() << "ns" << nss2.toString_forTest()
                               << "ui" << uuid2 << "o" << BSON("_id" << 1))));
-    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), o);
 
     // This test assumes that the top level tenantId matches the tenantId in the first entry
     ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
     ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
 }
+
+INSTANTIATE_TEST_SUITE_P(AllowEndOfTransaction,
+                         OpObserverTransactionEndOfTransactionTest,
+                         testing::Bool());
 
 /**
  * Test fixture for testing OpObserver behavior specific to retryable findAndModify.
@@ -6975,7 +7015,23 @@ private:
     int _prevPackingLimit;
 };
 
-TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
+// Parameterized variant of OpObserverMultiEntryTransactionTest that runs the multi-entry
+// transactional op-observer tests with the 'allowEndOfTransaction' server parameter both enabled
+// and disabled. The 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag is enabled
+// throughout, because the write path requires it in addition to the parameter.
+class OpObserverMultiEntryTransactionEndOfTransactionTest
+    : public OpObserverMultiEntryTransactionTest,
+      public testing::WithParamInterface<bool> {
+private:
+    // The write path requires the feature flag in addition to the parameter, so it is enabled for
+    // the whole test while the parameter is varied.
+    unittest::ServerParameterGuard _featureFlagGuard{
+        "featureFlagEndOfTransactionChangeEventSynthesis", true};
+};
+
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, TransactionSingleStatementTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts;
@@ -7007,10 +7063,12 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
                            << "ns" << nss.toString_forTest() << "ui" << uuid << "o"
                            << BSON("_id" << 0 << "a" << std::string(BSONObjMaxUserSize, 'a'))
                            << "o2" << BSON("_id" << 0))));
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntry.getObject());
 }
 
-TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, TransactionalInsertTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts1;
@@ -7080,10 +7138,12 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                                            << "ns" << nss2.toString_forTest() << "ui" << uuid2
                                            << "o" << BSON("_id" << 3) << "o2" << BSON("_id" << 3)))
                    << "count" << 4);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[3].getObject());
 }
 
-TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, TransactionalUpdateTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
@@ -7146,10 +7206,12 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                                                 << "o" << BSON("$set" << BSON("data" << "y"))
                                                 << "o2" << BSON("_id" << 1)))
                         << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[1].getObject());
 }
 
-TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, TransactionalDeleteTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
 
@@ -7198,7 +7260,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                                 << "ns" << nss2.toString_forTest() << "ui" << uuid2
                                                 << "o" << BSON("_id" << 1)))
                         << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[1].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
@@ -7560,7 +7622,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     assertTxnRecordStartOpTime(boost::none);
 }
 
-TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, UnpreparedTransactionPackingTest) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     gMaxNumberOfTransactionOperationsInSingleOplogEntry = std::numeric_limits<int>::max();
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -7618,8 +7682,12 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
                  << BSON("op" << "i"
                               << "ns" << nss2.toString_forTest() << "ui" << uuid2 << "o"
                               << BSON("_id" << 3) << "o2" << BSON("_id" << 3))));
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[0].getObject());
 }
+
+INSTANTIATE_TEST_SUITE_P(AllowEndOfTransaction,
+                         OpObserverMultiEntryTransactionEndOfTransactionTest,
+                         testing::Bool());
 
 TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
     gMaxNumberOfTransactionOperationsInSingleOplogEntry = std::numeric_limits<int>::max();
@@ -7775,10 +7843,26 @@ private:
     }
 };
 
+// Parameterized variant of OpObserverLargeTransactionTest that runs the large-transaction test
+// with the 'allowEndOfTransaction' server parameter both enabled and disabled. The
+// 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag is enabled throughout, because the
+// write path requires it in addition to the parameter.
+class OpObserverLargeTransactionEndOfTransactionTest : public OpObserverLargeTransactionTest,
+                                                       public testing::WithParamInterface<bool> {
+private:
+    // The write path requires the feature flag in addition to the parameter, so it is enabled for
+    // the whole test while the parameter is varied.
+    unittest::ServerParameterGuard _featureFlagGuard{
+        "featureFlagEndOfTransactionChangeEventSynthesis", true};
+};
+
 // Tests that a large transaction may be committed.  This test creates a transaction with two
 // operations that together are just big enough to exceed the size limit, which should result in
 // a two oplog entry transaction.
-TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntries) {
+TEST_P(OpObserverLargeTransactionEndOfTransactionTest,
+       LargeTransactionCreatesMultipleOplogEntries) {
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -7822,8 +7906,12 @@ TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntri
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(operation2.toBSON()) << "count" << 2);
-    ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+    ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[1].getObject());
 }
+
+INSTANTIATE_TEST_SUITE_P(AllowEndOfTransaction,
+                         OpObserverLargeTransactionEndOfTransactionTest,
+                         testing::Bool());
 
 TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());

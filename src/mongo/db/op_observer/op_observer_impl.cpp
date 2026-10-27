@@ -10,6 +10,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
@@ -2472,13 +2473,21 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
 
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
+
+    // Mark the final applyOps entry of this unprepared transaction only when the end-of-transaction
+    // write path is enabled, i.e. both the 'featureFlagEndOfTransactionChangeEventSynthesis'
+    // feature flag and the 'allowEndOfTransaction' server parameter are on. A change stream uses
+    // this marker to distinguish transactions committed while the feature was enabled from those
+    // committed while it was disabled.
+    const bool allowEndOfTransaction = isEndOfTransactionWritePathEnabled();
     auto numOplogEntries =
         transactionOperations.logOplogEntries(oplogSlots,
                                               applyOpsOplogSlotAndOperationAssignment,
                                               wallClockTime,
                                               WriteUnitOfWork::noGroup,
                                               logApplyOpsForUnpreparedTransaction,
-                                              &imageToWrite);
+                                              &imageToWrite,
+                                              allowEndOfTransaction);
     invariant(numOplogEntries > 0);
 
     repl::OpTime commitOpTime = oplogSlots[numOplogEntries - 1];

@@ -357,8 +357,8 @@ std::size_t TransactionOperations::logOplogEntries(
     Date_t wallClockTime,
     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
     LogApplyOpsFn logApplyOpsFn,
-    boost::optional<TransactionOperation::ImageBundle>* prePostImageToWriteToImageCollection)
-    const {
+    boost::optional<TransactionOperation::ImageBundle>* prePostImageToWriteToImageCollection,
+    bool allowEndOfTransaction) const {
     invariant(oplogSlots.size() == applyOpsOperationAssignment.numberOfOplogSlotsRequired,
               "Wrong number of oplogSlots reserved");
 
@@ -450,6 +450,14 @@ std::size_t TransactionOperations::logOplogEntries(
         // See SERVER-40676 and SERVER-40678.
         if (lastOp && !firstOp && !applyOpsAppliedSeparately) {
             applyOpsBuilder.append("count", static_cast<long long>(_transactionOperations.size()));
+        }
+
+        // Mark the final applyOps entry of an unprepared transaction committed while
+        // end-of-transaction change stream support was enabled. A change stream uses this marker
+        // to distinguish transactions committed while the feature was enabled from those committed
+        // while it was disabled.
+        if (allowEndOfTransaction && lastOp && !prepare) {
+            applyOpsBuilder.append("allowEndOfTransaction", true);
         }
 
         repl::MutableOplogEntry oplogEntry;
