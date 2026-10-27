@@ -238,6 +238,19 @@ const unpackTests = [
         pipeline: [{$_internalSplitPipeline: {mergeType: "anyShard"}}],
     },
     {
+        stage: "$_internalComputeGeoNearDistance",
+        pipeline: [
+            {
+                $_internalComputeGeoNearDistance: {
+                    key: "m.loc",
+                    distanceField: "dist",
+                    distanceMultiplier: 1,
+                    near: {type: "Point", coordinates: [106.65589, 10.787627]},
+                },
+            },
+        ],
+    },
+    {
         stage: "$_internalSetWindowFields",
         pipeline: [{$_internalSetWindowFields: {sortBy: {time: 1}, output: {sum: {$sum: {}}}}}],
     },
@@ -502,7 +515,6 @@ const skippedStages = [
     "$mergeCursors",
     "$_internalDensify",
     "$setMetadata",
-    "$_internalComputeGeoNearDistance",
 
     // Stages that can only run in stream processors.
     "$hoppingWindow",

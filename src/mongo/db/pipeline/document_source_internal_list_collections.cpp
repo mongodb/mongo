@@ -24,8 +24,9 @@ DocumentSourceInternalListCollections::DocumentSourceInternalListCollections(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx) {}
 
-REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(
-    _internalListCollections, DocumentSourceInternalListCollections::LiteParsed::parse);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalListCollections,
+                                     DocumentSourceInternalListCollections::LiteParsed::parse,
+                                     AllowedWithApiStrict::kInternal);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalListCollections,
                                                    DocumentSourceInternalListCollections,
