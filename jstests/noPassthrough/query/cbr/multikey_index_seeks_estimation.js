@@ -27,7 +27,7 @@ const conn = MongoRunner.runMongod({
 const db = conn.getDB("test");
 
 // SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
-// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
+// TODO SERVER-137714: Remove this early exit once legacy SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
     jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     MongoRunner.stopMongod(conn);

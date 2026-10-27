@@ -14,7 +14,6 @@
  */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ArrayDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/array.js";
 import {BooleanDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/boolean.js";
 import {
@@ -35,13 +34,6 @@ import {
 import {TwoFieldDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/multifield.js";
 import {NumberDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/number.js";
 import {StringDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/string.js";
-
-// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
-// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
-    quit();
-}
 
 const collName = jsTestName();
 const coll = db[collName];

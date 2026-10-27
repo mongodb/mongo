@@ -93,7 +93,7 @@ describe("a limit above a shard filter", function () {
         // Under SBE, CBR still ranks the plans, so the limit propagation test still runs, but the
         // winning plan's explain output carries no cost or cardinality estimates for it to be
         // asserted on.
-        // TODO SERVER-130179: Remove this early return once SBE explain reports these estimates.
+        // TODO SERVER-137714: Remove this early return once legacy SBE explain reports these estimates.
         if (getEngine(explain) !== "classic") {
             return;
         }
