@@ -38,6 +38,7 @@ resmoke_suite_test(
         "auth",
         "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -86,6 +87,7 @@ resmoke_suite_test(
         "encrypt",
         "incompatible_with_bazel_remote_test",  # jstests/ssl/ssl_x509_SAN.js requires IPv6, which is disabled on remote executors.
         "patch_build",
+        "release_critical",
         "ssl",
     ],
     deps = [
@@ -108,6 +110,7 @@ resmoke_suite_test(
         "ci-all-variants",
         "encrypt",
         "patch_build",
+        "release_critical",
         "ssl",
     ],
     deps = [
@@ -158,6 +161,7 @@ resmoke_suite_test(
         "incompatible_oscrypto",
         "ocsp",
         "patch_build",
+        "release_critical",
         "ssl",
     ],
     deps = [
@@ -179,6 +183,7 @@ resmoke_suite_test(
         "ci-all-variants",
         "encrypt",
         "patch_build",
+        "release_critical",
         "ssl",
     ],
     target_compatible_with = select({
@@ -204,6 +209,7 @@ resmoke_suite_test(
         "ci-all-variants",
         "encrypt",
         "patch_build",
+        "release_critical",
         "ssl",
     ],
     deps = [
@@ -418,6 +424,7 @@ resmoke_suite_test(
     tags = [
         "ci-all-variants",
         "patch_build",
+        "release_critical",
         "sasl",
     ],
     target_compatible_with = select({
@@ -445,6 +452,7 @@ resmoke_suite_test(
         "ci-all-variants",
         "incompatible_with_bazel_remote_test",  #log_rotate_command_errors.js fails, "cannot find name for user ID 108" since remote executors do not have a username set.
         "patch_build",
+        "release_critical",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -472,6 +480,7 @@ resmoke_suite_test(
         "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
         "patch_build",
+        "release_critical",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -529,6 +538,7 @@ resmoke_suite_test(
         "incompatible_debian",
         "incompatible_oscrypto",
         "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+        "release_critical",
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -557,6 +567,7 @@ resmoke_suite_test(
     tags = [
         "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+        "release_critical",
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
