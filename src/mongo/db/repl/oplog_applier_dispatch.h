@@ -3,14 +3,10 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/modules.h"
 
 #include <vector>
@@ -23,14 +19,6 @@ class SizeCountCheckpointValidator;
 namespace repl {
 
 class SessionUpdateTracker;
-
-// Consumes worker multikey metadata, merges it, and flushes it in timestamp order.
-[[nodiscard]] Status flushMultikeyPathInfo(OperationContext* opCtx,
-                                           StorageInterface* storageInterface,
-                                           std::vector<WorkerMultikeyPathInfo>& multikeyVector,
-                                           Timestamp firstTimeInBatch,
-                                           Timestamp lastTimeInBatch,
-                                           Timestamp lastApplied);
 
 /**
  * ops - This only modifies the isForCappedCollection and hasRetryImage fields on each op. It does
