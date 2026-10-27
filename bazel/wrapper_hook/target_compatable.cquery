@@ -1,6 +1,8 @@
 def format(target):
-    if "IncompatiblePlatformProvider" in providers(target):
-        result = "False"
-    else:
-        result = "True"
-    return "%s %s" % (target.label, result)
+    target_providers = providers(target)
+    compatible = "IncompatiblePlatformProvider" not in target_providers
+    return json.encode({
+        "label": str(target.label),
+        "compatible": compatible,
+        "tags": target_providers["//bazel:separate_debug.bzl%TagInfo"].tags if compatible else [],
+    })
