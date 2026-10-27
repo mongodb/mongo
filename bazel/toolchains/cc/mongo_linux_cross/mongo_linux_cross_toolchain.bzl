@@ -124,11 +124,11 @@ def _host_linker_substitutions(ctx):
             "})"
         )
 
-    def _host_files_select():
+    def _host_files_select(name):
         return (
             "select({\n" +
-            "    \"{}\": \":all_files\",\n".format(host_linker_select) +
-            "    \"//conditions:default\": \":host_output_tools\",\n" +
+            "    \"{}\": \":{}\",\n".format(host_linker_select, name) +
+            "    \"//conditions:default\": \":host_{}\",\n".format(name) +
             "})"
         )
 
@@ -138,8 +138,9 @@ def _host_linker_substitutions(ctx):
         # local persistent-container links and points at the native host archive.
         "{host_linker_files}": "select({\n" +
                                "    \"{}\": [],\n".format(host_linker_select) +
-                               "    \"//conditions:default\": [\"@mongo_toolchain_v5//:all_files\"],\n" +
+                               "    \"//conditions:default\": [\"@mongo_toolchain_v5//:linker_files\"],\n" +
                                "})",
+        "{host_runtime_files}": "[\"@mongo_toolchain_v5//:tool_runtime_files\"]",
         "{host_linker_bin_dirs}": "select({\n" +
                                   "    \"{}\": [],\n".format(host_linker_select) +
                                   "    \"//conditions:default\": {},\n".format(repr(target_linker_bin_dirs)) +
@@ -167,10 +168,10 @@ def _host_linker_substitutions(ctx):
         "{host_dwp_tool_path}": _host_tool_select("host_tools/v5/bin/llvm-dwp"),
         "{host_objcopy_tool_path}": _host_tool_select("host_tools/v5/bin/llvm-objcopy"),
         "{host_strip_tool_path}": _host_tool_select("host_tools/v5/bin/strip"),
-        "{host_ar_files}": _host_files_select(),
-        "{host_dwp_files}": _host_files_select(),
-        "{host_objcopy_files}": _host_files_select(),
-        "{host_strip_files}": _host_files_select(),
+        "{host_ar_files}": _host_files_select("ar_files"),
+        "{host_dwp_files}": _host_files_select("dwp_files"),
+        "{host_objcopy_files}": _host_files_select("objcopy_files"),
+        "{host_strip_files}": _host_files_select("strip_files"),
     }
 
 def _env_candidates(ctx, suffix):
@@ -273,12 +274,13 @@ mongo_linux_cc_toolchain_config(
 cc_toolchain(
     name = "cc_mongo_exec_toolchain",
     all_files = ":all_files",
-    ar_files = ":all_files",
-    compiler_files = ":all_files",
-    dwp_files = ":all_files",
+    ar_files = ":ar_files",
+    as_files = ":compiler_files",
+    compiler_files = ":compiler_files",
+    dwp_files = ":dwp_files",
     linker_files = ":linker_files",
-    objcopy_files = ":all_files",
-    strip_files = ":all_files",
+    objcopy_files = ":objcopy_files",
+    strip_files = ":strip_files",
     toolchain_config = ":cc_clang_exec_toolchain_config",
 )
 
@@ -390,6 +392,7 @@ def linux_cross_toolchain_substitutions(ctx, use_composed_toolchain):
         "{extra_loads}": _exec_toolchain_loads(),
         "{extra_toolchains}": _exec_toolchain_fragment(ctx),
         "{host_linker_files}": "[]",
+        "{host_runtime_files}": "[]",
         "{host_linker_bin_dirs}": "[]",
         "{host_linker_resource_dir}": "\"\"",
         "{host_linker_tool_path}": "\"\"",
@@ -398,10 +401,10 @@ def linux_cross_toolchain_substitutions(ctx, use_composed_toolchain):
         "{host_dwp_tool_path}": "\"\"",
         "{host_objcopy_tool_path}": "\"\"",
         "{host_strip_tool_path}": "\"\"",
-        "{host_ar_files}": "\":all_files\"",
-        "{host_dwp_files}": "\":all_files\"",
-        "{host_objcopy_files}": "\":all_files\"",
-        "{host_strip_files}": "\":all_files\"",
+        "{host_ar_files}": "\":ar_files\"",
+        "{host_dwp_files}": "\":dwp_files\"",
+        "{host_objcopy_files}": "\":objcopy_files\"",
+        "{host_strip_files}": "\":strip_files\"",
         "{toolchain_repo_name}": ctx.name,
         "{toolchain_repo_dir}": "external/" + ctx.name,
         "{arch}": ctx.attr.target_arch,

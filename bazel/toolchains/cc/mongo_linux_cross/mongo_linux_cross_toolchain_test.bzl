@@ -37,6 +37,17 @@ def _windows_unix_root_test_impl(ctx):
                 substitutions.get("{windows_unix_root}"),
                 "{} (composed={})".format(target_arch, use_composed_toolchain),
             )
+            for name in ("ar_files", "objcopy_files", "dwp_files", "strip_files"):
+                files = substitutions["{host_" + name + "}"]
+                asserts.false(env, ":all_files" in files, files)
+                asserts.true(env, '":{}"'.format(name) in files, files)
+                if use_composed_toolchain:
+                    asserts.true(env, '":host_{}"'.format(name) in files, files)
+            if use_composed_toolchain:
+                asserts.true(env, "@mongo_toolchain_v5//:linker_files" in substitutions["{host_linker_files}"])
+                asserts.equals(env, '["@mongo_toolchain_v5//:tool_runtime_files"]', substitutions["{host_runtime_files}"])
+            else:
+                asserts.equals(env, "[]", substitutions["{host_runtime_files}"])
 
     return unittest.end(env)
 

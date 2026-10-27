@@ -46,6 +46,12 @@ py_binary(
 mongo_toolchain_flags_test_suite(name = "mongo_toolchain_flags_test")
 
 py_test(
+    name = "mongo_toolchain_filegroups_test",
+    srcs = ["mongo_toolchain_filegroups_test.py"],
+    data = ["mongo_toolchain_filegroups.bzl"],
+)
+
+py_test(
     name = "windows_host_toolchain_test",
     srcs = ["windows_host_toolchain_test.py"],
     data = [

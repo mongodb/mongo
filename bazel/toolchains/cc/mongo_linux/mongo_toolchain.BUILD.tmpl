@@ -2,6 +2,7 @@
 
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load("@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_filegroups.bzl", "mongo_toolchain_filegroups")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 load(
     "@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_tool_paths.bzl",
@@ -231,10 +232,16 @@ LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + select({
 
 {sysroot_defs}
 
-# Helper target for the toolchain (see below):
+# Preserve the complete archive for explicit consumers such as clang-tidy and
+# custom script rules. Standard C++ actions use the smaller groups below.
 filegroup(
     name = "all_files",
-    srcs = glob(["**/*"]) + select({
+    srcs = glob(["**/*"]) + [":action_support_files"],
+)
+
+filegroup(
+    name = "action_support_files",
+    srcs = select({
         "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": ["@pgo_data//:clang_pgo_files"],
         "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": ["@pgo_data//:gcc_pgo_files"],
         "@//conditions:default": [],
@@ -256,13 +263,10 @@ filegroup(
     }){sysroot_all_files}
 )
 
-# Native output tools exposed by a composed Linux cross repository. The
-# cross-repository rule creates these symlinks to the host mongo toolchain so
-# local archive/debug actions can use host-executable ar/objcopy/strip tools
-# without relying on a non-normalized ``..`` tool path.
-filegroup(
-    name = "host_output_tools",
-    srcs = glob(["host_tools/v5/bin/*"]),
+mongo_toolchain_filegroups(
+    version = "{version}",
+    support_files = [":action_support_files"],
+    host_runtime_files = {host_runtime_files},
 )
 
 filegroup(
@@ -294,7 +298,7 @@ filegroup(
 
 filegroup(
     name = "linker_files",
-    srcs = [":all_files"] + LIBVOIDSTAR_FILES + {host_linker_files},
+    srcs = [":linker_tool_files"] + LIBVOIDSTAR_FILES + {host_linker_files},
 )
 
 feature_attrs = get_common_features_attrs()
@@ -426,7 +430,8 @@ cc_toolchain(
     name = "cc_mongo_toolchain",
     all_files = ":all_files",
     ar_files = {host_ar_files},
-    compiler_files = ":all_files",
+    as_files = ":compiler_files",
+    compiler_files = ":compiler_files",
     dwp_files = {host_dwp_files},
     linker_files = ":linker_files",
     objcopy_files = {host_objcopy_files},
