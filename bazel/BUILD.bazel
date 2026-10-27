@@ -3,6 +3,7 @@ load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/uv:defs.bzl", "dependency")
+load(":debug_resources_test.bzl", "debug_resources_test_suite")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])
@@ -117,3 +118,5 @@ native_binary(
 
 # TODO(SERVER-129799): add these tests to CI.
 test_exec_properties_test_suite(name = "test_exec_properties_tests")
+
+debug_resources_test_suite(name = "debug_resources_tests")

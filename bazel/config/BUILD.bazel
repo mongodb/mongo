@@ -3480,6 +3480,58 @@ config_setting(
 # fission
 # --------------------------------------
 
+# The default split-DWARF configuration is a specialization of the conservative
+# profile below, so select() prefers its smaller measured reservations.
+config_setting(
+    name = "measured_debug_processing",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {
+        ":mongo_toolchain_version": "v5",
+        ":compiler_type": "clang",
+        ":opt": "off",
+        ":dbg_level": "1",
+        ":compress_debug_compile": "True",
+        ":dtlto": "False",
+        ":thin_lto": "False",
+        ":asan": "False",
+        ":tsan": "False",
+        ":ubsan": "False",
+        ":msan": "False",
+        ":fsan": "False",
+        ":lsan": "False",
+        ":coverage": "False",
+        ":gcov": "False",
+        ":pgo_profile_generate": "False",
+        ":cspgo_profile_generate": "False",
+    },
+    values = {"fission": "yes"},
+)
+
+# Full DWARF, dbg_level=3, and disabled compile-time compression were measured
+# on small tests, mongobridge, a large unit test, and mongod. Use those larger
+# reservations for ordinary dbg/opt/evg configurations. Large LTO and instrumented
+# binaries remain unmeasured; keep the previous reservations for those configs.
+config_setting(
+    name = "conservative_debug_processing",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {
+        ":mongo_toolchain_version": "v5",
+        ":compiler_type": "clang",
+        ":dtlto": "False",
+        ":thin_lto": "False",
+        ":asan": "False",
+        ":tsan": "False",
+        ":ubsan": "False",
+        ":msan": "False",
+        ":fsan": "False",
+        ":lsan": "False",
+        ":coverage": "False",
+        ":gcov": "False",
+        ":pgo_profile_generate": "False",
+        ":cspgo_profile_generate": "False",
+    },
+)
+
 config_setting(
     name = "fission_enabled",
     values = {

@@ -3,6 +3,7 @@ load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_cc//cc/common:cc_shared_library_info.bzl", "CcSharedLibraryInfo")
 load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load(":debug_resources.bzl", "DebugLinkInfo", "debug_link_info_aspect", "debug_resource_sets", "linux_extract_resource_set", "linux_gdb_apply_resource_set", "linux_gdb_generate_resource_set", "linux_strip_resource_set")
 
 TagInfo = provider(
     doc = "A rule provider to pass around tags that were passed to rules.",
@@ -314,23 +315,6 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
         linker_input = linker_input,
     )
 
-# TODO(SERVER-101906): We assume the worst-case resource usage to avoid OOMs. Figure out if we can
-# generalize numInputs for all link configurations so that this can more intelligently set resource
-# expectations.
-def linux_extract_resource_set(os, numInputs):
-    return {
-        "cpu": 6,
-        "memory": 20 * 1024,  # 20 GB
-        "local_test": 1,
-    }
-
-def linux_strip_resource_set(os, numInputs):
-    return {
-        "cpu": 3,
-        "memory": 10 * 1024,  # 10 GB
-        "local_test": 1,
-    }
-
 def _generate_gdb_index(ctx, inputs, input_bin):
     binary_output_groups = ctx.attr.binary_with_debug[OutputGroupInfo]
     dwo_files = binary_output_groups.dwo_files if "dwo_files" in binary_output_groups else depset()
@@ -342,7 +326,7 @@ def _generate_gdb_index(ctx, inputs, input_bin):
         tools = [ctx.attr.gdb_generate_index[DefaultInfo].files_to_run],
         arguments = [input_bin.path, index_bundle.path],
         env = {"BUILD_WORKING_DIRECTORY": ""},
-        resource_set = linux_extract_resource_set,
+        resource_set = linux_gdb_generate_resource_set,
         mnemonic = "GdbGenerateIndex",
     )
     return index_bundle
@@ -359,7 +343,7 @@ def _apply_gdb_index(ctx, cc_toolchain, input_bin, index_bundle, output_bin):
             "no-remote": "1",
             "local": "1",
         },
-        resource_set = linux_strip_resource_set,
+        resource_set = linux_gdb_apply_resource_set,
         mnemonic = "GdbApplyIndex",
     )
 
@@ -369,6 +353,15 @@ def linux_extraction(ctx, cc_toolchain, inputs):
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
     input_file = ctx.attr.binary_with_debug.files.to_list()
     if input_bin:
+        extract_resources = linux_extract_resource_set
+        strip_resources = linux_strip_resource_set
+        if ctx.attr.type == "program" and DebugLinkInfo in ctx.attr.binary_with_debug:
+            resources = debug_resource_sets(
+                ctx.attr.binary_with_debug[DebugLinkInfo],
+                ctx.attr.debug_resource_profile,
+            )
+            extract_resources = resources.extract
+            strip_resources = resources.strip
         gdb_index_added = ctx.attr.type == "program" and ctx.attr.gdb_index_enabled
         input_bin_with_gdb_index = input_bin
         if gdb_index_added:
@@ -381,7 +374,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
                 inputs = depset([input_bin_with_gdb_index], transitive = [cc_toolchain.all_files]),
-                resource_set = linux_extract_resource_set if ctx.attr.type == "program" else None,
+                resource_set = extract_resources if ctx.attr.type == "program" else None,
                 arguments = [
                     "--only-keep-debug",
                     input_bin_with_gdb_index.path,
@@ -394,7 +387,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
                 inputs = depset([input_bin_with_gdb_index, debug_info], transitive = [cc_toolchain.all_files]),
-                resource_set = linux_strip_resource_set if ctx.attr.type == "program" else None,
+                resource_set = strip_resources if ctx.attr.type == "program" else None,
                 arguments = [
                     "--strip-debug",
                     "--add-gnu-debuglink",
@@ -788,11 +781,13 @@ extract_debuginfo_binary = rule(
         "binary_with_debug": attr.label(
             doc = "The the binary to extract debuginfo from.",
             allow_files = True,
+            aspects = [debug_link_info_aspect],
         ),
         "type": attr.string(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "debug_resource_profile": attr.string(default = "unmeasured", values = ["split", "conservative", "unmeasured"], doc = "Select measured objcopy tiers for the debug configuration."),
         "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
         "gdb_generate_index": attr.label(
             default = "//bazel:gdb-generate-index-noop",
@@ -835,11 +830,13 @@ extract_debuginfo_test = rule(
         "binary_with_debug": attr.label(
             doc = "The the binary to extract debuginfo from.",
             allow_files = True,
+            aspects = [debug_link_info_aspect],
         ),
         "type": attr.string(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "debug_resource_profile": attr.string(default = "unmeasured", values = ["split", "conservative", "unmeasured"], doc = "Select measured objcopy tiers for the debug configuration."),
         "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
         "gdb_generate_index": attr.label(
             default = "//bazel:gdb-generate-index-noop",

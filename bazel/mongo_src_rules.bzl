@@ -780,6 +780,11 @@ def _mongo_cc_binary_and_test(
             type = "program",
             tags = original_tags + ["final_target"],
             enabled = SEPARATE_DEBUG_ENABLED,
+            debug_resource_profile = select({
+                "//bazel/config:measured_debug_processing": "split",
+                "//bazel/config:conservative_debug_processing": "conservative",
+                "//conditions:default": "unmeasured",
+            }),
             enable_pdb = PDB_GENERATION_ENABLED,
             gdb_index_enabled = GDB_INDEX_ENABLED,
             gdb_generate_index = GDB_GENERATE_INDEX,
@@ -795,6 +800,11 @@ def _mongo_cc_binary_and_test(
             type = "program",
             tags = original_tags + ["final_target"],
             enabled = SEPARATE_DEBUG_ENABLED,
+            debug_resource_profile = select({
+                "//bazel/config:measured_debug_processing": "split",
+                "//bazel/config:conservative_debug_processing": "conservative",
+                "//conditions:default": "unmeasured",
+            }),
             enable_pdb = PDB_GENERATION_ENABLED,
             gdb_index_enabled = GDB_INDEX_ENABLED,
             gdb_generate_index = GDB_GENERATE_INDEX,
