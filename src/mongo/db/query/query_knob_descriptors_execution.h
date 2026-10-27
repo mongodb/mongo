@@ -41,6 +41,10 @@
          kInternalQuerySpillingMinAvailableDiskSpaceBytesName,                            \
          internalQuerySpillingMinAvailableDiskSpaceBytes,                                 \
          getInternalQuerySpillingMinAvailableDiskSpaceBytes)                              \
+    KNOB(kSbeBlueprintRewriteMaxFirings,                                                  \
+         kInternalQuerySbeBlueprintRewriteMaxFiringsName,                                 \
+         internalQuerySbeBlueprintRewriteMaxFirings,                                      \
+         getSbeBlueprintRewriteMaxFirings)                                                \
     KNOB(kMaxGroupAccumulatorsInSbe,                                                      \
          kInternalMaxGroupAccumulatorsInSbeName,                                          \
          gInternalMaxGroupAccumulatorsInSbe,                                              \

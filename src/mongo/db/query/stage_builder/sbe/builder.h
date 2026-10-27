@@ -849,6 +849,12 @@ public:
 private:
     std::pair<SbStage, PlanStageSlots> buildTree();
 
+    /**
+     * In debug builds, checks that every slot the tree rooted at 'root' reads is defined by a node
+     * of the tree or registered in the RuntimeEnvironment.
+     */
+    void checkSlotsDefined(SbBlueprintNodeIdx root, const sbe::value::SlotVector& rootUses);
+
     inline void analyzeTree() {
         _qsnAnalysis.analyzeTree(_root);
     }

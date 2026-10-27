@@ -41,6 +41,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
@@ -968,6 +969,18 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
     return build(_root, reqs);
 }
 
+void SlotBasedStageBuilder::checkSlotsDefined(SbBlueprintNodeIdx root,
+                                              const sbe::value::SlotVector& rootUses) {
+    if constexpr (kDebugBuild) {
+        auto usage = SbBlueprintSlotUsage::build(_state.blueprint(), root, rootUses);
+        usage.forEachUndefinedUse([&](sbe::value::SlotId slot) {
+            tassert(13627004,
+                    str::stream() << "Blueprint slot " << slot << " is used but defined by no node",
+                    _state.env->isSlotRegistered(slot));
+        });
+    }
+}
+
 SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
     tassert(
         11051839,
@@ -1014,22 +1027,20 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
         }
     }
 
-    if constexpr (kDebugBuild) {
-        // Every slot the plan reads must be defined by a node of the tree or registered in the
-        // RuntimeEnvironment.
-        auto rootUses = sbe::value::SlotVector{};
-        if (_data->resultSlot) {
-            rootUses.push_back(*_data->resultSlot);
-        }
-        if (_data->recordIdSlot) {
-            rootUses.push_back(*_data->recordIdSlot);
-        }
-        auto usage = SbBlueprintSlotUsage::build(_state.blueprint(), stage.idx(), rootUses);
-        usage.forEachUndefinedUse([&](sbe::value::SlotId slot) {
-            tassert(13627004,
-                    str::stream() << "Blueprint slot " << slot << " is used but defined by no node",
-                    _state.env->isSlotRegistered(slot));
-        });
+    // The slots read by the consumer of the plan: the result and the record id.
+    auto rootUses = sbe::value::SlotVector{};
+    if (_data->resultSlot) {
+        rootUses.push_back(*_data->resultSlot);
+    }
+    if (_data->recordIdSlot) {
+        rootUses.push_back(*_data->recordIdSlot);
+    }
+
+    checkSlotsDefined(stage.idx(), rootUses);
+
+    if (_state.ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeBlueprintRewrites)) {
+        // TODO SERVER-136270: Run the rewrite rules over the blueprint tree here, then check its
+        // slots again.
     }
 
     // The whole blueprint tree has been built; lower it to sbe::PlanStages.

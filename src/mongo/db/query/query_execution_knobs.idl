@@ -457,6 +457,21 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQuerySbeBlueprintRewriteMaxFirings:
+        description: >-
+            The most rewrite rule firings for one SBE stage builder blueprint. A rewrite that
+            reaches it stops and keeps the partly rewritten blueprint.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySbeBlueprintRewriteMaxFirings"
+        cpp_vartype: Atomic<int>
+        default: 10000
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeBlueprintRewriteMaxFirings
+
     internalQueryMaxDocValidationErrorConsideredValues:
         mod_visibility: needs_replacement
         description: >-
