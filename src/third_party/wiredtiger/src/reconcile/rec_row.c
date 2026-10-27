@@ -242,11 +242,13 @@ __rec_pack_delta_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV 
   WTI_REC_KV *value, WT_TIME_AGGREGATE *ta)
 {
     WT_PAGE_HEADER *header;
+    WT_TIME_AGGREGATE local_ta;
     WTI_REC_KV t_kv_struct, *t_kv;
     size_t packed_size;
     uint8_t *p;
 
     WT_CLEAR(t_kv_struct);
+    WT_TIME_AGGREGATE_INIT(&local_ta);
 
     /* Ensure that we never build a delta for the first key. */
     WT_ASSERT(session, !r->cell_zero);
@@ -280,12 +282,8 @@ __rec_pack_delta_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV 
         t_kv->buf.data = NULL;
         t_kv->buf.size = 0;
         /*
-         * Initialize an empty instance of WT_TIME_AGGREGATE to avoid writing a page deleted
-         * structure to disk.
+         * Pass an empty time aggregate to avoid writing a page-deleted structure to disk.
          */
-        static WT_TIME_AGGREGATE local_ta;
-        WT_TIME_AGGREGATE_INIT(&local_ta);
-
         t_kv->cell_len = __wt_cell_pack_addr(session, &t_kv->cell, WT_CELL_ADDR_DEL_VISIBLE_ALL,
           WT_RECNO_OOB, NULL, &local_ta, false, 0);
         t_kv->len = t_kv->cell_len;

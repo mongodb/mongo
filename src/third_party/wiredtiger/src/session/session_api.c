@@ -1845,6 +1845,70 @@ err:
 }
 
 /*
+ * __session_verify_all --
+ *     Verify every table in the database. With the abort_on_error option set, stop at the first
+ *     failure.
+ */
+static int
+__session_verify_all(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    int first_error;
+    const char *key;
+    bool abort_on_error;
+
+    cursor = NULL;
+    first_error = 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "abort_on_error", &cval));
+    abort_on_error = cval.val != 0;
+
+    /*
+     * Iterate the metadata entries, verifying each table. Typically each table has multiple
+     * entries, so only verify table and layered entries; this skips the duplicate entries and any
+     * entries that are not supported with verify.
+     */
+    WT_ERR(__wt_metadata_cursor(session, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &key));
+        if (!WT_PREFIX_MATCH(key, "table:") && !WT_PREFIX_MATCH(key, "layered:"))
+            continue;
+        ret = __wt_schema_worker(
+          session, key, __wt_verify, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY);
+        if (ret == 0 || ret == ENOTSUP)
+            continue;
+        if (abort_on_error)
+            goto err;
+        if (first_error == 0)
+            first_error = ret;
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+    ret = first_error;
+
+err:
+    if (cursor != NULL)
+        WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}
+
+/*
+ * __session_verify_dispatch --
+ *     Route a verify call: no URI verifies every table in the database, anything else verifies a
+ *     single object.
+ */
+static int
+__session_verify_dispatch(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+    if (uri == NULL)
+        return (__session_verify_all(session, cfg));
+
+    return (__wt_schema_worker(
+      session, uri, __wt_verify, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+}
+
+/*
  * __session_verify --
  *     WT_SESSION->verify method.
  */
@@ -1859,10 +1923,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
     /* Block out checkpoints to avoid spurious EBUSY errors. */
-    WT_WITH_CHECKPOINT_LOCK(session,
-      WT_WITH_SCHEMA_LOCK(session,
-        ret = __wt_schema_worker(
-          session, uri, __wt_verify, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
+    WT_WITH_CHECKPOINT_LOCK(
+      session, WT_WITH_SCHEMA_LOCK(session, ret = __session_verify_dispatch(session, uri, cfg)));
     WT_ERR(ret);
 err:
     if (ret != 0)

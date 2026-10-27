@@ -435,15 +435,21 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.runWt(["verify"])
 
-        # Purposely corrupt the last two tables. Test that verifying the database
-        # with the abort option stops after seeing the first corrupted table.
+        # Purposely corrupt the last two tables. Verifying all tables reports every corrupted
+        # table by default, and stops after the first one with the abort option.
         for i in range(1, ntables):
             with self.open_and_position(self.tablename + str(i), 75) as f:
                 for i in range(0, 4096):
                     f.write(struct.pack('B', 0))
 
+        self.runWt(["-p", "verify"], outfilename="verifyerr.out", errfilename="verifyerr.err", failure=True)
+        self.assertNotEqual(self.count_file_contains("verifyerr.err",
+            f"file:{self.test_name}.a1.wt"), 0)
+        self.assertNotEqual(self.count_file_contains("verifyerr.err",
+            f"file:{self.test_name}.a2.wt"), 0)
+
         self.runWt(["-p", "verify", "-a"], outfilename="verifyerr.out", errfilename="verifyerr.err", failure=True)
+        self.assertNotEqual(self.count_file_contains("verifyerr.err",
+            f"file:{self.test_name}.a1.wt"), 0)
         self.assertEqual(self.count_file_contains("verifyerr.err",
-            f"table:{self.test_name}.a1: WT_ERROR"), 1)
-        self.assertEqual(self.count_file_contains("verifyerr.err",
-            f"table:{self.test_name}.a2: WT_ERROR"), 0)
+            f"file:{self.test_name}.a2.wt"), 0)

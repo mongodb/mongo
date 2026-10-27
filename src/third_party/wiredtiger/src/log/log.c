@@ -176,6 +176,47 @@ __log_wait_for_earlier_slot(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot)
 }
 
 /*
+ * __log_wait_for_lsn --
+ *     Wait for the log write LSN to reach the given LSN.
+ *
+ * This loop mirrors __log_wait_for_earlier_slot(): keep the wake-up strategy in sync. It waits for
+ *     write_lsn to reach at least the target, not exactly a slot's release LSN, because the target
+ *     was captured under the slot lock and write_lsn may already have moved past it.
+ */
+static void
+__log_wait_for_lsn(WT_SESSION_IMPL *session, WT_LSN *lsn)
+{
+    WTI_LOG *log;
+    WT_LOG_MANAGER *log_mgr;
+    int yield_count;
+
+    log_mgr = &S2C(session)->log_mgr;
+    log = log_mgr->log;
+    yield_count = 0;
+
+    while (__wt_log_cmp(&log->write_lsn, lsn) < 0) {
+        /*
+         * If we're on a locked path and the write LSN is not advancing, unlock in case an earlier
+         * thread is trying to switch its slot and complete its operation.
+         */
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT))
+            __wt_spin_unlock(session, &log->log_slot_lock);
+        /*
+         * This may not be initialized if we are starting at an older log file version. So only
+         * signal if valid.
+         */
+        if (log_mgr->wrlsn.cond != NULL)
+            __wt_cond_signal(session, log_mgr->wrlsn.cond);
+        if (++yield_count < WT_THOUSAND)
+            __wt_yield();
+        else
+            __wt_cond_wait(session, log->log_write_cond, 200, NULL);
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT))
+            __wt_spin_lock(session, &log->log_slot_lock);
+    }
+}
+
+/*
  * __log_fs_read --
  *     Wrapper when reading from a log file.
  */
@@ -479,6 +520,7 @@ __wt_log_get_backup_files(
 {
     WT_DECL_RET;
     WTI_LOG *log;
+    WTI_LOGSLOT *slot;
     WT_LSN tmp_lsn;
     uint32_t id, max, max_file, min_file;
     u_int count, i;
@@ -515,7 +557,29 @@ __wt_log_get_backup_files(
      * the backup.
      */
     F_SET(log, WTI_LOG_FORCE_NEWFILE);
-    WT_RET(__wti_log_force_write(session, true, NULL));
+    /*
+     * If another thread switched the active slot first, the force write does nothing and the log
+     * has not moved on: retry until it has. The sealed file must not accept records once the list
+     * is returned to the caller.
+     */
+    do
+        WT_RET(__wti_log_force_write(session, true, NULL));
+    while (__wt_lsn_file(&log->alloc_lsn) <= max_file);
+    /*
+     * The force write seals the file, but slots that were closed before it may still be waiting for
+     * their final write. The caller can copy the files as soon as this function returns, so wait
+     * for every record allocated to the sealed file to reach it. The new active slot's release LSN
+     * is the end of that file.
+     *
+     * The slot lock keeps the pointer and its release LSN consistent: no other thread can switch or
+     * reuse the slot while we read them. Other readers access the pointer without the lock, so keep
+     * using the atomic access.
+     */
+    WTI_WITH_SLOT_LOCK(session, log, {
+        slot = __wt_atomic_load_ptr_relaxed(&log->active_slot);
+        WT_ASSIGN_LSN(&tmp_lsn, &slot->slot_release_lsn);
+    });
+    __log_wait_for_lsn(session, &tmp_lsn);
     WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
     for (max = 0, i = 0; i < count;) {

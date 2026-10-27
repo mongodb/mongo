@@ -65,15 +65,14 @@ verify_one(WT_SESSION *session, char *config, char *uri)
 int
 util_verify(WT_SESSION *session, int argc, char *argv[])
 {
-    WT_CURSOR *cursor;
     WT_DECL_ITEM(config);
     WT_DECL_RET;
     WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
     int ch;
-    char *dump_offsets, *key, *uri;
-    bool abort_on_error, dump_all_data, dump_key_data;
+    char *dump_offsets, *uri;
+    bool dump_all_data, dump_key_data;
 
-    abort_on_error = dump_all_data = dump_key_data = false;
+    dump_all_data = dump_key_data = false;
     dump_offsets = uri = NULL;
 
     WT_RET(__wt_scr_alloc(session_impl, 0, &config));
@@ -81,7 +80,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     while ((ch = __wt_getopt(progname, argc, argv, "acd:kSstu?")) != EOF)
         switch (ch) {
         case 'a':
-            abort_on_error = true;
+            WT_ERR(__wt_buf_catfmt(session_impl, config, "abort_on_error,"));
             break;
         case 'c':
             WT_ERR(__wt_buf_catfmt(session_impl, config, "read_corrupt,"));
@@ -142,36 +141,12 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 
     /* Verify all the tables if no particular URI is specified. */
     if (argc < 1) {
-        /* Open the metadata file and iterate through its entries, verifying each one. */
-        if ((ret = session->open_cursor(session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
-            /*
-             * If there is no metadata (yet), this will return ENOENT. Treat that the same as an
-             * empty metadata.
-             */
-            if (ret == ENOENT)
-                ret = 0;
-
-            WT_ERR(util_err(session, ret, "%s: WT_SESSION.open_cursor", WT_METADATA_URI));
-        }
-
-        while ((ret = cursor->next(cursor)) == 0) {
-            if ((ret = cursor->get_key(cursor, &key)) != 0)
-                WT_ERR(util_cerr(cursor, "get_key", ret));
-
-            /*
-             * Typically each WT file will have multiple entries, and so only run verify on table
-             * entries to prevent unnecessary work. Skip over the double up entries and also any
-             * entries that are not supported with verify.
-             */
-            if (WT_PREFIX_MATCH(key, "table:") || WT_PREFIX_MATCH(key, "layered:")) {
-                if (abort_on_error)
-                    WT_ERR_ERROR_OK(verify_one(session, (char *)config->data, key), ENOTSUP, false);
-                else
-                    WT_TRET(verify_one(session, (char *)config->data, key));
-            }
-        }
-        if (ret == WT_NOTFOUND)
-            ret = 0;
+        /* A NULL URI asks the library to verify every table in the database. */
+        if ((ret = session->verify(session, NULL, (char *)config->data)) != 0)
+            ret = util_err(session, ret, "session.verify: all tables");
+        else if (verbose)
+            /* Verbose configures a progress counter, move to the next line. */
+            printf("\n");
     } else {
         if ((uri = util_uri(session, *argv, "table")) == NULL)
             goto err;
