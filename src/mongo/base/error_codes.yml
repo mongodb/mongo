@@ -1398,5 +1398,11 @@ error_codes:
       extra: PrepareConflictInfo,
     }
 
+  - {
+      code: 533,
+      name: StreamProcessorEventBridgeConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
