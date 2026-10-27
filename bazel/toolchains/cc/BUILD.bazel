@@ -112,3 +112,14 @@ py_test(
     ],
     deps = ["//buildscripts/package_test:toolchain_versions"],
 )
+
+# Cargo build scripts execute as native host tools. During a Windows cross build,
+# the current C++ toolchain is the Linux cross toolchain used by remote C++
+# actions, so expose the native toolchain explicitly for rules_rust.
+alias(
+    name = "cargo_build_script_cc_toolchain",
+    actual = select({
+        "//bazel/platforms:windows_cross": "@mongo_windows_toolchain//:mongo_win_cc_toolchain",
+        "//conditions:default": "@bazel_tools//tools/cpp:current_cc_toolchain",
+    }),
+)

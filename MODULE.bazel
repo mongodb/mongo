@@ -673,6 +673,9 @@ single_version_override(
         "//bazel/rules_rust:ppc64le_crates.patch",
         "//bazel/rules_rust:ppc64le_cargo_bazel_url.patch",
         "//bazel/rules_rust:cargo_build_script_pwd_flags.patch",
+        "//bazel/rules_rust:cargo_build_script_windows_path.patch",
+        "//bazel/rules_rust:cargo_build_script_windows_native_cc.patch",
+        "//bazel/rules_rust:windows_cross_execution.patch",
     ],
     version = "0.69.0",
 )

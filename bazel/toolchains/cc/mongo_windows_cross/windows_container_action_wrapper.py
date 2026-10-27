@@ -60,6 +60,20 @@ _MOUNT_PROBE_PREFIX = ".mongo-windows-action-mount-"
 _PREFLIGHT_COMMAND_TIMEOUT_SECONDS = 180.0
 _DIAGNOSTIC_COMMAND_TIMEOUT_SECONDS = 60.0
 _ENV_FILE_UNSUPPORTED_MARKER = "unknown flag: --env-file"
+# Match whole whitespace-delimited tokens while keeping double-quoted segments
+# together, including spaces. Quoted and unquoted segments can share a token,
+# as in /WHOLEARCHIVE:"C:/build dir/external/.../libstd.a".
+_LINKER_RESPONSE_TOKEN_RE = re.compile(r'(?<!\S)(?:[^\s"]|"[^"]*")+(?!\S)')
+# Used with fullmatch after removing grouping quotes: capture an optional linker
+# option (e.g. /WHOLEARCHIVE:) separately from the rules_rust stdlib .a path.
+# Allow a Windows drive prefix and either path separator; exclude other colons
+# so linker-option prefixes cannot be consumed as part of the archive path.
+_RUST_STDLIB_ARCHIVE_RE = re.compile(
+    r"(?P<option>/[A-Za-z][A-Za-z0-9_-]*:)?"
+    r"(?P<path>(?:[A-Za-z]:)?[^:]*external[\\/]rules_rust\+\+rust\+"
+    r"[^:]*[\\/]lib[\\/]rustlib[\\/][^:]+?\.a)"
+)
+
 _DRIVE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 # Environment variables that describe the Windows host or this runner's own Docker routing.
@@ -705,6 +719,141 @@ def _emit_failure_diagnostics(
         print(f"  {line}", file=sys.stderr)
 
 
+def _host_path(cwd: pathlib.Path, argument: str) -> pathlib.Path:
+    """Resolves an action argument using the Windows host's current directory."""
+    value = argument.strip().strip("\"'")
+    path = pathlib.Path(value)
+    if path.is_absolute():
+        return path
+    return cwd / path
+
+
+def _rust_stdlib_source_path(
+    cwd: pathlib.Path, output_base: pathlib.Path, archive_path: str
+) -> pathlib.Path | None:
+    """Finds the .rlib behind a rules_rust stdlib .a input.
+
+    rules_rust creates these files with Bazel's internal SymlinkAction. A Windows host can
+    materialize that action as an NTFS symlink, but a Linux container cannot reliably consume
+    the symlink when the link action runs in a persistent bind mount. The .rlib itself is a
+    normal declared input, so use it as the source for a real archive file.
+    """
+    normalized = archive_path.replace("\\", "/")
+    marker = "external/"
+    external_index = normalized.find(marker)
+    if external_index < 0:
+        return None
+    relative = pathlib.PurePosixPath(normalized[external_index:])
+    if ".." in relative.parts or len(relative.parts) < 3 or not relative.name.endswith(".a"):
+        return None
+    relative = relative.with_suffix(".rlib")
+    for base in (cwd, output_base):
+        candidate = base / pathlib.Path(*relative.parts)
+        try:
+            # Repository roots can themselves be Bazel symlinks into a repository cache.
+            # Allow those while keeping individual inputs inside that repository.
+            repository = (base / relative.parts[0] / relative.parts[1]).resolve(strict=True)
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            continue
+        if resolved.is_relative_to(repository) and resolved.is_file():
+            return resolved
+    return None
+
+
+def _materialize_rust_stdlib_archives(
+    cwd: pathlib.Path,
+    output_base: pathlib.Path,
+    scratch_root: pathlib.Path,
+    prefix: str,
+    tool_args: Sequence[str],
+    temporary_files: list[pathlib.Path] | None = None,
+) -> list[str]:
+    """Rewrites lld-link response files to use real Rust stdlib archive files.
+
+    The returned arguments are otherwise unchanged. Hard links keep this cheap on the normal
+    single-drive Windows layout; copying is the fallback when the source and sandbox are on
+    different volumes.
+    """
+    rewritten_args = list(tool_args)
+    materialized: dict[pathlib.Path, pathlib.Path] = {}
+    response_index = 0
+    for index, argument in enumerate(tool_args):
+        if not argument.startswith("@") or len(argument) == 1:
+            continue
+        params_path = _host_path(cwd, argument[1:])
+        try:
+            params_text = params_path.read_text(encoding="utf-8")
+        except (AttributeError, OSError, UnicodeError):
+            continue
+
+        changed = False
+
+        def replace_archive(match: re.Match[str]) -> str:
+            nonlocal changed
+            token = match.group(0)
+            # lld-link uses Windows double-quote grouping, including when it runs
+            # on Linux. Inspect entire tokens so paths with spaces stay intact.
+            archive_match = _RUST_STDLIB_ARCHIVE_RE.fullmatch(token.replace('"', ""))
+            if archive_match is None:
+                return token
+            archive = archive_match.group("path")
+            source = _rust_stdlib_source_path(cwd, output_base, archive)
+            if source is None:
+                return token
+            destination = materialized.get(source)
+            if destination is None:
+                archive_root = scratch_root / "rust-stdlib-archives"
+                archive_root.mkdir(parents=True, exist_ok=True)
+                destination = archive_root / f"{hashlib.sha256(str(source).encode()).hexdigest()}.a"
+                with shared.exclusive_file_lock(destination.with_suffix(".lock"), required=True):
+                    if not destination.exists():
+                        try:
+                            os.link(source, destination)
+                        except OSError:
+                            # Publish only complete copies, so interrupted writes cannot be
+                            # mistaken for cached archives by subsequent link actions.
+                            with tempfile.NamedTemporaryFile(
+                                dir=archive_root, suffix=".tmp", delete=False
+                            ) as temporary:
+                                temporary_path = pathlib.Path(temporary.name)
+                            try:
+                                shutil.copyfile(source, temporary_path)
+                                os.replace(temporary_path, destination)
+                            finally:
+                                temporary_path.unlink(missing_ok=True)
+                materialized[source] = destination
+            changed = True
+            path = _container_path(destination, prefix).as_posix()
+            quoted_path = subprocess.list2cmdline([path])
+            if '"' in token and quoted_path == path:
+                quoted_path = f'"{path}"'
+            return (archive_match.group("option") or "") + quoted_path
+
+        rewritten_text = _LINKER_RESPONSE_TOKEN_RE.sub(replace_archive, params_text)
+        if not changed:
+            continue
+
+        scratch_root.mkdir(parents=True, exist_ok=True)
+        rewritten_params = scratch_root / (
+            f"rust-link-params-{uuid.uuid4().hex}-{response_index}.params"
+        )
+        response_index += 1
+        if temporary_files is not None:
+            temporary_files.append(rewritten_params)
+        rewritten_params.write_text(rewritten_text, encoding="utf-8", newline="")
+        rewritten_args[index] = f"@{_container_path(rewritten_params, prefix).as_posix()}"
+    return rewritten_args
+
+
+def _is_lld_link(tool: str) -> bool:
+    return pathlib.PurePosixPath(tool.replace("\\", "/")).name.lower() in {
+        "lld-link",
+        "lld-link.cmd",
+        "lld-link.exe",
+    }
+
+
 def _run_in_container(
     config: Mapping[str, object],
     config_path: pathlib.Path,
@@ -739,7 +888,20 @@ def _run_in_container(
         *tool_args,
     ]
     env_file = _write_env_file(environment, scratch_root)
+    temporary_files: list[pathlib.Path] = []
     try:
+        if _is_lld_link(tool):
+            arguments = _materialize_rust_stdlib_archives(
+                cwd, output_base, scratch_root, prefix, tool_args, temporary_files
+            )
+            command = [
+                "/bin/sh",
+                "-c",
+                _ACTION_SHIM,
+                "windows-action-shim",
+                *_tool_command(tool),
+                *arguments,
+            ]
         exit_code, output, launch = shared.run_container_command(
             docker,
             name,
@@ -759,6 +921,8 @@ def _run_in_container(
             )
     finally:
         env_file.unlink(missing_ok=True)
+        for temporary_file in temporary_files:
+            temporary_file.unlink(missing_ok=True)
 
     if output:
         sys.stderr.write(output if output.endswith("\n") else output + "\n")

@@ -687,6 +687,11 @@ def _windows_cross_host_wrapper_action_args(
             # Genrules use the Linux execution platform's shell, including third-party
             # header-copy actions, so they cannot run on the Windows client.
             "--strategy=Genrule=remote",
+            "--strategy=Rustc=remote,local",
+            "--strategy=RustcMetadata=remote,local",
+            "--strategy=CargoBuildScriptRun=remote,local",
+            "--strategy=CargoBuildScriptCopy=remote,local",
+            "--@rules_rust//rust/settings:toolchain_linker_preference=rust",
             "--strategy=WindowsRC=remote",
             "--features=-thin_archive",
             "--test_strategy=standalone",

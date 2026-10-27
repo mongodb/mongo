@@ -1,6 +1,27 @@
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
+
+config_setting(
+    name = "windows_cross_native_cargo",
+    constraint_values = ["@platforms//os:windows"],
+    flag_values = {"//bazel/config:windows_cross_local_container_actions": "True"},
+)
+
+py_test(
+    name = "windows_cross_execution_test",
+    srcs = ["windows_cross_execution_test.py"],
+    args = [
+        "$(location @rules_rust//cargo/private:cargo_build_script_wrapper.bzl)",
+        "$(location @rules_rust//cargo/private:cargo_build_script.bzl)",
+    ],
+    data = [
+        "windows_cross_execution.bzl",
+        "@rules_rust//cargo/private:cargo_build_script.bzl",
+        "@rules_rust//cargo/private:cargo_build_script_wrapper.bzl",
+    ] + glob(["*.patch"]),
+)
 
 # Allocator shim for linking Rust rlibs into a C++ binary on Windows.
 # On Linux, rules_rust provides this automatically. On Windows, MSVC doesn't

@@ -1,0 +1,13 @@
+diff --git cargo/private/cargo_build_script.bzl cargo/private/cargo_build_script.bzl
+--- cargo/private/cargo_build_script.bzl
++++ cargo/private/cargo_build_script.bzl
+@@ -322,1 +322,8 @@
+-    runfiles_dir = ctx.actions.declare_directory("{}.cargo_runfiles".format(ctx.label.name))
++    # The runfiles directory is also used as the build script's working
++    # directory. Keep its output name short on Windows, where the external
++    # repository name is repeated in the manifest path and can otherwise hit
++    # MAX_PATH before the build script starts.
++    runfiles_dir_name = "{}.cargo_runfiles".format(ctx.label.name)
++    if ctx.executable.script.extension == "exe":
++        runfiles_dir_name = "{}.rf".format(ctx.label.name)
++    runfiles_dir = ctx.actions.declare_directory(runfiles_dir_name)

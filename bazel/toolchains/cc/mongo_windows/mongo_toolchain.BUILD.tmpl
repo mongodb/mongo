@@ -131,6 +131,7 @@ cc_toolchain(
     objcopy_files = ":all_files",
     strip_files = ":all_files",
     toolchain_config = "cc_msvc_toolchain_config",
+    visibility = ["//visibility:public"],
 )
 
 toolchain(

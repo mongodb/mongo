@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from unittest import mock
 
 from bazel.toolchains.cc.mongo_windows_cross import windows_container_action_wrapper as wrapper
@@ -130,8 +132,9 @@ class FakeDocker:
 
 
 def _fake_container_path(path, prefix="/mnt"):
-    """Maps a POSIX test path below ``/`` to ``/mnt/z/...`` so real files can stand in for Z:."""
-    return pathlib.PurePosixPath(prefix, "z", *pathlib.PurePosixPath(os.fspath(path)).parts[1:])
+    """Maps native test paths to ``/mnt/z/...`` so real files can stand in for Z:."""
+    normalized = os.fspath(path).replace("\\", "/")
+    return pathlib.PurePosixPath(prefix, "z", *pathlib.PurePosixPath(normalized).parts[1:])
 
 
 class WindowsContainerActionWrapperTest(unittest.TestCase):
@@ -139,6 +142,18 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
         self.environ = mock.patch.dict(os.environ, {}, clear=True)
         self.environ.start()
         self.addCleanup(self.environ.stop)
+
+    def test_fake_container_path_preserves_windows_and_posix_components(self):
+        for path in (
+            pathlib.PurePosixPath("/tmp/build with spaces/libstd.a"),
+            pathlib.PureWindowsPath("C:/tmp/build with spaces/libstd.a"),
+            r"C:\tmp\build with spaces\libstd.a",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    _fake_container_path(path).as_posix(),
+                    "/mnt/z/tmp/build with spaces/libstd.a",
+                )
 
     @staticmethod
     def _config(**overrides):
@@ -230,6 +245,247 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn("usage:", result.stderr)
             self.assertNotIn("ImportError", result.stderr)
+
+    def test_materialize_rust_stdlib_archives_rewrites_response_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            cwd = root / "execroot"
+            scratch_root = root / "sandbox" / wrapper._RUNNER_SCRATCH_DIRNAME
+            stdlib = (
+                cwd
+                / "external"
+                / "rules_rust++rust+rw-863368150_tools"
+                / "lib"
+                / "rustlib"
+                / "x86_64-pc-windows-msvc"
+                / "lib"
+                / "libstd-abc.rlib"
+            )
+            stdlib.parent.mkdir(parents=True)
+            stdlib.write_bytes(b"rust archive")
+            params = cwd / "bazel-out" / "x64_windows-opt" / "bin" / "link.params"
+            params.parent.mkdir(parents=True)
+            params.write_text(
+                "bazel-out/x64_windows-opt/bin/external/"
+                "rules_rust++rust+rw-863368150_tools/lib/rustlib/"
+                "x86_64-pc-windows-msvc/lib/libstd-abc.a\n"
+                "bazel-out/x64_windows-opt/bin/src/main.obj\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(wrapper, "_container_path", side_effect=_fake_container_path):
+                rewritten = wrapper._materialize_rust_stdlib_archives(
+                    cwd,
+                    root / "output-base",
+                    scratch_root,
+                    "/mnt",
+                    [f"@{params.relative_to(cwd)}"],
+                )
+
+            self.assertEqual(len(rewritten), 1)
+            self.assertTrue(rewritten[0].startswith("@/mnt/z/"))
+            rewritten_params = next(scratch_root.glob("rust-link-params-*.params"))
+            rewritten_text = rewritten_params.read_text(encoding="utf-8")
+            self.assertIn("/mnt/z/", rewritten_text)
+            self.assertNotIn("libstd-abc.a\n", rewritten_text)
+            self.assertIn("src/main.obj", rewritten_text)
+            archive = next((scratch_root / "rust-stdlib-archives").glob("*.a"))
+            self.assertEqual(archive.read_bytes(), b"rust archive")
+            self.assertFalse(archive.is_symlink())
+
+    @staticmethod
+    def _rust_stdlib_fixture(root: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, str]:
+        cwd = root / "execroot"
+        archive = (
+            "external/rules_rust++rust+rw-863368150_tools/lib/rustlib/"
+            "x86_64-pc-windows-msvc/lib/libstd-abc.a"
+        )
+        source = (cwd / archive).with_suffix(".rlib")
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"rust archive")
+        return cwd, source, archive
+
+    def test_rust_archive_rewriting_preserves_linker_options(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            cwd, source, archive = self._rust_stdlib_fixture(root)
+            scratch = root / "scratch"
+            params = cwd / "link.params"
+            windows_archive = archive.replace("/", "\\")
+            tokens = [
+                archive,
+                f"/WHOLEARCHIVE:bazel-out/bin/{archive}",
+                f'/wholearchive:"{archive}"',
+                f'/DEFAULTLIB:"{archive}"',
+                f'"C:\\build\\bazel-out\\bin\\{windows_archive}"',
+                f"/WHOLEARCHIVE:{archive.replace('libstd-abc', 'libmissing')}",
+                "main.obj",
+            ]
+            params.write_text("\n".join(tokens), encoding="utf-8")
+            with mock.patch.object(wrapper, "_container_path", side_effect=_fake_container_path):
+                wrapper._materialize_rust_stdlib_archives(
+                    cwd, root / "output-base", scratch, "/mnt", ["@link.params"]
+                )
+            rewritten = next(scratch.glob("rust-link-params-*.params")).read_text().splitlines()
+            destination = next((scratch / "rust-stdlib-archives").glob("*.a"))
+            path = _fake_container_path(destination).as_posix()
+            self.assertEqual(
+                rewritten,
+                [
+                    path,
+                    f"/WHOLEARCHIVE:{path}",
+                    f'/wholearchive:"{path}"',
+                    f'/DEFAULTLIB:"{path}"',
+                    f'"{path}"',
+                    *tokens[5:],
+                ],
+            )
+            self.assertEqual(destination.read_bytes(), source.read_bytes())
+
+    def test_rust_archive_rewriting_handles_spaces_in_paths(self) -> None:
+        for scratch_name in ("scratch", "scratch with spaces"):
+            with self.subTest(scratch=scratch_name), tempfile.TemporaryDirectory() as temp_dir:
+                root = pathlib.Path(temp_dir)
+                cwd, source, archive = self._rust_stdlib_fixture(root)
+                scratch = root / scratch_name
+                params = cwd / "link.params"
+                windows_archive = archive.replace("/", "\\")
+                tokens = [
+                    archive,
+                    f'"C:/build with spaces/bazel-out/bin/{archive}"',
+                    f'/WHOLEARCHIVE:"C:/build with spaces/bazel-out/bin/{archive}"',
+                    f'"/DEFAULTLIB:C:/build with spaces/bazel-out/bin/{archive}"',
+                    f'"C:\\Users\\O\'Brien\\build with spaces\\{windows_archive}"',
+                    f'/WHOLEARCHIVE:"{archive.replace("libstd-abc", "libmissing")}"',
+                    '"object with spaces.obj"',
+                ]
+                params.write_text("\t".join(tokens) + "\n", encoding="utf-8")
+                with mock.patch.object(
+                    wrapper, "_container_path", side_effect=_fake_container_path
+                ):
+                    wrapper._materialize_rust_stdlib_archives(
+                        cwd, root / "output-base", scratch, "/mnt", ["@link.params"]
+                    )
+                rewritten = next(scratch.glob("rust-link-params-*.params")).read_text()
+                destination = next((scratch / "rust-stdlib-archives").glob("*.a"))
+                path = _fake_container_path(destination).as_posix()
+                bare_path = f'"{path}"' if " " in path else path
+                expected = [
+                    bare_path,
+                    f'"{path}"',
+                    f'/WHOLEARCHIVE:"{path}"',
+                    f'/DEFAULTLIB:"{path}"',
+                    f'"{path}"',
+                    *tokens[5:],
+                ]
+                self.assertEqual(rewritten, "\t".join(expected) + "\n")
+                self.assertEqual(destination.read_bytes(), source.read_bytes())
+
+    def test_rust_stdlib_rejects_traversal_and_file_symlink_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            cwd, source, archive = self._rust_stdlib_fixture(root)
+            outside = root / "outside.rlib"
+            outside.write_bytes(b"outside")
+            (cwd / "outside.rlib").write_bytes(b"outside")
+            for path in (
+                "external/../outside.a",
+                archive.replace("libstd-abc.a", "../../../../../../outside.a"),
+            ):
+                with self.subTest(path=path):
+                    self.assertIsNone(wrapper._rust_stdlib_source_path(cwd, root, path))
+            source.unlink()
+            source.symlink_to(outside)
+            self.assertIsNone(wrapper._rust_stdlib_source_path(cwd, root, archive))
+
+    def test_rust_stdlib_supports_external_repository_symlinks_and_output_base(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            output_base, source, archive = self._rust_stdlib_fixture(root)
+            repository = output_base / "external" / pathlib.PurePosixPath(archive).parts[1]
+            relocated = root / "repository-cache"
+            repository.rename(relocated)
+            repository.symlink_to(relocated, target_is_directory=True)
+            # The resolver canonicalizes host aliases such as macOS's /tmp -> /private/tmp.
+            expected = (relocated / source.relative_to(repository)).resolve()
+            self.assertEqual(
+                wrapper._rust_stdlib_source_path(root / "sandbox", output_base, archive), expected
+            )
+
+    def test_parallel_rust_archive_materialization(self) -> None:
+        for copy_fallback in (False, True):
+            with (
+                self.subTest(copy_fallback=copy_fallback),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
+                root = pathlib.Path(temp_dir)
+                cwd, source, archive = self._rust_stdlib_fixture(root)
+                scratch = root / "scratch"
+                (cwd / "link.params").write_text(archive, encoding="utf-8")
+                barrier = Barrier(8)
+
+                def materialize(_: int) -> list[str]:
+                    barrier.wait(timeout=10)
+                    return wrapper._materialize_rust_stdlib_archives(
+                        cwd, root / "output-base", scratch, "/mnt", ["@link.params"]
+                    )
+
+                copyfile = shutil.copyfile
+
+                def copy(source_path: pathlib.Path, destination: pathlib.Path) -> None:
+                    self.assertEqual(list((scratch / "rust-stdlib-archives").glob("*.a")), [])
+                    copyfile(source_path, destination)
+
+                with (
+                    mock.patch.object(wrapper, "_container_path", side_effect=_fake_container_path),
+                    mock.patch.object(
+                        wrapper.os,
+                        "link",
+                        side_effect=OSError("different volumes") if copy_fallback else os.link,
+                    ) as link,
+                    mock.patch.object(wrapper.shutil, "copyfile", side_effect=copy) as copy_mock,
+                    ThreadPoolExecutor(max_workers=8) as executor,
+                ):
+                    results = list(executor.map(materialize, range(8)))
+                self.assertEqual(link.call_count, 1)
+                self.assertEqual(copy_mock.call_count, int(copy_fallback))
+                destination = next((scratch / "rust-stdlib-archives").glob("*.a"))
+                self.assertEqual(destination.read_bytes(), source.read_bytes())
+                for params in scratch.glob("rust-link-params-*.params"):
+                    self.assertEqual(
+                        params.read_text(), _fake_container_path(destination).as_posix()
+                    )
+                self.assertEqual(len({result[0] for result in results}), 8)
+
+    def test_failed_rust_archive_copy_is_not_cached(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            cwd, source, archive = self._rust_stdlib_fixture(root)
+            scratch = root / "scratch"
+            (cwd / "link.params").write_text(archive, encoding="utf-8")
+
+            def interrupted_copy(source_path: pathlib.Path, destination: pathlib.Path) -> None:
+                destination.write_bytes(b"partial")
+                raise OSError("copy interrupted")
+
+            with (
+                mock.patch.object(wrapper, "_container_path", side_effect=_fake_container_path),
+                mock.patch.object(wrapper.os, "link", side_effect=OSError("different volumes")),
+            ):
+                with mock.patch.object(wrapper.shutil, "copyfile", side_effect=interrupted_copy):
+                    with self.assertRaisesRegex(OSError, "copy interrupted"):
+                        wrapper._materialize_rust_stdlib_archives(
+                            cwd, root, scratch, "/mnt", ["@link.params"]
+                        )
+                self.assertEqual(list((scratch / "rust-stdlib-archives").glob("*.a")), [])
+                self.assertEqual(list((scratch / "rust-stdlib-archives").glob("*.tmp")), [])
+                wrapper._materialize_rust_stdlib_archives(
+                    cwd, root, scratch, "/mnt", ["@link.params"]
+                )
+            self.assertEqual(
+                next((scratch / "rust-stdlib-archives").glob("*.a")).read_bytes(),
+                source.read_bytes(),
+            )
 
     def test_container_tool_and_tool_command(self):
         self.assertEqual(
@@ -334,7 +590,9 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
         sandbox_base.mkdir()
         values = {
             # Any existing executable: the fake intercepts every Docker CLI invocation.
-            "docker_command": "/bin/sh",
+            "docker_command": wrapper.shlex.join([sys.executable]),
+            # Routing is tested separately; these fixtures use the fake engine on every host.
+            "engine_selected": True,
             "sandbox_base": str(sandbox_base),
             "shared_install_dir": str(root / "shared-install"),
             "repo_root": str(root / "repo"),
@@ -380,7 +638,7 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             self.assertNotIn("diagnostics", written)
 
             launch = next(call for call in docker.commands("exec") if "-d" in call)
-            self.assertEqual(launch[0], config["docker_command"])
+            self.assertEqual(launch[0], sys.executable)
             self.assertEqual(
                 launch[1:5],
                 [
@@ -592,7 +850,7 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
     def test_ensure_preflight_container_probes_mounts_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir).resolve()
-            config_path, config = self._write_config(root, docker_host_mode="wsl")
+            config_path, config = self._write_config(root, docker_host_mode="wsl-local")
             probe_commands: list[list[str]] = []
 
             def probe(command):
@@ -637,7 +895,8 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
     def test_ensure_preflight_container_recreates_once_then_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir).resolve()
-            config_path, config = self._write_config(root, docker_host_mode="wsl")
+            # TCP drive-mount recovery is exercised separately from preflight retries.
+            config_path, config = self._write_config(root, docker_host_mode="wsl-local")
             docker = FakeDocker(
                 records={
                     "mount-probe": ("MISSING: /mnt/z/output-base/probe\nread-only: /mnt/z\n", 1)
@@ -664,18 +923,22 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             host_bin = pathlib.Path(temp_dir) / "Program Files" / "Docker"
             host_bin.mkdir(parents=True)
-            docker = host_bin / "docker"
+            docker = host_bin / ("docker.exe" if os.name == "nt" else "docker")
             docker.write_text("#!/bin/sh\n", encoding="utf-8")
             docker.chmod(0o755)
 
             resolved = wrapper._resolve_docker_command(
                 self._config(docker_command="docker", host_path=str(host_bin))
             )
-            self.assertEqual(resolved, [str(docker)])
+            # Windows which() may use PATHEXT's uppercase .EXE spelling.
+            self.assertEqual(
+                [os.path.normcase(path) for path in resolved or []],
+                [os.path.normcase(str(docker))],
+            )
             # The resolved command survives a round trip through the config's shlex quoting.
             self.assertEqual(
                 wrapper._docker_command({"docker_command": wrapper.shlex.join(resolved)}),
-                [str(docker)],
+                resolved,
             )
             self.assertEqual(
                 wrapper._resolve_docker_command(

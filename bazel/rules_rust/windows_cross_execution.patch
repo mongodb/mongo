@@ -1,0 +1,189 @@
+diff --git rust/private/rust.bzl rust/private/rust.bzl
+--- rust/private/rust.bzl
++++ rust/private/rust.bzl
+@@ -619,6 +619,9 @@
+ 
+ # Internal attributes core to Rustc actions.
+ RUSTC_ATTRS = {
++    "_mongo_windows_cross_local_container_actions": attr.label(
++        default = Label("@@//bazel/config:windows_cross_local_container_actions"),
++    ),
+     "_always_enable_metadata_output_groups": attr.label(
+         default = Label("//rust/settings:always_enable_metadata_output_groups"),
+     ),
+diff --git rust/private/rustc.bzl rust/private/rustc.bzl
+--- rust/private/rustc.bzl
++++ rust/private/rustc.bzl
+@@ -15,6 +15,7 @@
+ """Functionality for constructing actions that invoke the Rust compiler"""
+ 
+ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
++load("@@//bazel/rules_rust:windows_cross_execution.bzl", "windows_cross_execution_requirements", "windows_cross_action_environment")
+ load(
+     "@bazel_tools//tools/build_defs/cc:action_names.bzl",
+     "CPP_LINK_DYNAMIC_LIBRARY_ACTION_NAME",
+@@ -1456,6 +1457,11 @@
+ 
+     # this is the final list of env vars
+     env.update(env_from_args)
++    env = windows_cross_action_environment(
++        ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++        toolchain.exec_triple.system,
++        env,
++    )
+ 
+     if hasattr(attr, "version") and attr.version != "0.0.0":
+         formatted_version = " v{}".format(attr.version)
+@@ -1512,6 +1518,10 @@
+             env = env,
+             arguments = args.all,
+             mnemonic = "Rustc",
++            execution_requirements = windows_cross_execution_requirements(
++                ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++                toolchain.exec_triple.system,
++            ),
+             progress_message = "Compiling Rust {} {}{} ({} file{})".format(
+                 crate_info.type,
+                 ctx.label.name,
+@@ -1530,6 +1540,10 @@
+                 env = env,
+                 arguments = args_metadata.all,
+                 mnemonic = "RustcMetadata",
++                execution_requirements = windows_cross_execution_requirements(
++                    ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++                    toolchain.exec_triple.system,
++                ),
+                 progress_message = "Compiling Rust metadata {} {}{} ({} file{})".format(
+                     crate_info.type,
+                     ctx.label.name,
+@@ -1550,6 +1564,10 @@
+             env = env,
+             arguments = [args.rustc_path, args.rustc_flags],
+             mnemonic = "Rustc",
++            execution_requirements = windows_cross_execution_requirements(
++                ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++                toolchain.exec_triple.system,
++            ),
+             progress_message = "Compiling Rust (without process_wrapper) {} {}{} ({} file{})".format(
+                 crate_info.type,
+                 ctx.label.name,
+diff --git cargo/private/cargo_build_script.bzl cargo/private/cargo_build_script.bzl
+--- cargo/private/cargo_build_script.bzl
++++ cargo/private/cargo_build_script.bzl
+@@ -2,6 +2,7 @@
+ 
+ load("@bazel_skylib//lib:paths.bzl", "paths")
+ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
++load("@@//bazel/rules_rust:windows_cross_execution.bzl", "windows_cross_execution_requirements", "windows_cross_action_environment", "windows_cross_native_cc_environment")
+ load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+ load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+ load("//rust:defs.bzl", "rust_common")
+@@ -55,6 +56,11 @@
+             arguments = [args],
+             inputs = [script],
+             outputs = [exe],
++            mnemonic = "CargoBuildScriptCopy",
++            execution_requirements = windows_cross_execution_requirements(
++                ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++                "windows" if ctx.executable._copy_file.extension == "exe" else "linux",
++            ),
+         )
+     else:
+         ctx.actions.symlink(
+@@ -96,6 +102,9 @@
+ """,
+     implementation = _cargo_build_script_runfiles_impl,
+     attrs = {
++        "_mongo_windows_cross_local_container_actions": attr.label(
++            default = Label("@@//bazel/config:windows_cross_local_container_actions"),
++        ),
+         "data": attr.label_list(
+             doc = "Data required by the build script.",
+             allow_files = True,
+@@ -455,7 +464,7 @@
+     # Pull in env vars which may be required for the cc_toolchain to work (e.g. on OSX, the SDK version).
+     # We hope that the linker env is sufficient for the whole cc_toolchain.
+     cc_toolchain, feature_configuration = find_cc_toolchain(ctx)
+-    if ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value:
++    if ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value and toolchain.exec_triple.system == "windows":
+         # The Windows cross C++ toolchain is intentionally selected for host
+         # C++ actions so they can run in the Linux RBE container. Cargo build
+         # scripts are different: the script is a native Windows executable
+@@ -517,6 +526,12 @@
+         if not env["AR"]:
+             env["AR"] = cc_toolchain.ar_executable
+ 
++        env = windows_cross_native_cc_environment(
++            ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++            toolchain.exec_triple.system,
++            env,
++        )
++
+         # Populate CFLAGS and CXXFLAGS that cc-rs relies on when building from source, in particular
+         # to determine the deployment target when building for apple platforms (`macosx-version-min`
+         # for example, itself derived from the `macos_minimum_os` Bazel argument).
+@@ -661,8 +676,16 @@
+         tools = tools,
+         inputs = depset(build_script_inputs, transitive = extra_inputs),
+         mnemonic = "CargoBuildScriptRun",
++        execution_requirements = windows_cross_execution_requirements(
++            ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++            toolchain.exec_triple.system,
++        ),
+         progress_message = "Running Cargo build script {}".format(pkg_name),
+-        env = env,
++        env = windows_cross_action_environment(
++            ctx.attr._mongo_windows_cross_local_container_actions[BuildSettingInfo].value,
++            toolchain.exec_triple.system,
++            env,
++        ),
+         toolchain = None,
+         use_default_shell_env = use_default_shell_env,
+     )
+diff --git cargo/private/cargo_build_script_wrapper.bzl cargo/private/cargo_build_script_wrapper.bzl
+--- cargo/private/cargo_build_script_wrapper.bzl
++++ cargo/private/cargo_build_script_wrapper.bzl
+@@ -198,6 +198,19 @@
+         **wrapper_kwargs
+     )
+ 
++    # This wrapper chooses the platform of the script's cfg=exec edge.
++    # Constraining rust_binary itself would only choose where rustc runs.
++    windows_wrapper_kwargs = dict(wrapper_kwargs)
++    windows_wrapper_kwargs["exec_compatible_with"] = ["@platforms//os:windows"]
++    cargo_build_script_runfiles(
++        name = name + "-windows",
++        script = ":{}_".format(name),
++        data = data,
++        tools = tools,
++        tags = binary_tags,
++        **windows_wrapper_kwargs
++    )
++
+     if use_default_shell_env == None:
+         sanitized_use_default_shell_env = -1
+     elif type(use_default_shell_env) == "bool":
+@@ -208,7 +221,10 @@
+     # This target executes the build script.
+     _build_script_run(
+         name = name,
+-        script = ":{}-".format(name),
++        script = select({
++            "@@//bazel/rules_rust:windows_cross_native_cargo": ":{}-windows".format(name),
++            "//conditions:default": ":{}-".format(name),
++        }),
+         crate_features = crate_features,
+         version = version,
+         build_script_env = build_script_env,
+diff --git cargo/private/BUILD.bazel cargo/private/BUILD.bazel
+--- cargo/private/BUILD.bazel
++++ cargo/private/BUILD.bazel
+@@ -1,6 +1,8 @@
+ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+ load("//rust:defs.bzl", "rust_binary")
++
++exports_files(["cargo_build_script_wrapper.bzl", "cargo_build_script.bzl"])
+ 
+ rust_binary(
+     name = "copy_file",
