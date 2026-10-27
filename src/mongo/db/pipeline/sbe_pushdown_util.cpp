@@ -12,7 +12,7 @@ namespace mongo {
 SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
                                                 bool sbeFullEnabled) {
     if (sbeFullEnabled) {
-        return SbeCompatibility::requiresSbeFull;
+        return SbeCompatibility::requiresTrySbe;
     } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
         return SbeCompatibility::requiresTrySbe;
     }

@@ -836,7 +836,7 @@ private:
     static SbeCompatibility getSbeCompatibility(ExpressionContext* const expCtx) {
         if constexpr (isAccumulatorExpressionImplementedInSbe<AccumulatorState>) {
             return isSbeAccumulatorExpressionEnabled(expCtx) ? SbeCompatibility::noRequirements
-                                                             : SbeCompatibility::requiresSbeFull;
+                                                             : SbeCompatibility::notCompatible;
         } else {
             return SbeCompatibility::notCompatible;
         }

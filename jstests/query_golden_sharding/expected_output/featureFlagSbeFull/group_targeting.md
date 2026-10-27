@@ -959,40 +959,80 @@
 ### Summarized explain
 ```json
 {
-	"group_targeting-rs0" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+	"group_targeting-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : false,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
 			}
-		]
-	},
-	"group_targeting-rs1" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						{
+							"$const" : 1
+						}
+					]
+				}
 			}
-		]
-	},
+		}
+	],
+	"group_targeting-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : false,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						{
+							"$const" : 1
+						}
+					]
+				}
+			}
+		}
+	],
 	"mergeType" : "router",
 	"mergerPart" : [
 		{
@@ -1076,40 +1116,98 @@
 ### Summarized explain
 ```json
 {
-	"group_targeting-rs0" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+	"group_targeting-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : false,
+							"otherField" : true,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
 			}
-		]
-	},
-	"group_targeting-rs1" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						{
+							"$const" : 1
+						}
+					]
+				},
+				"otherField" : {
+					"$top" : {
+						"output" : "$otherField",
+						"sortBy" : {
+							"shardKey" : 1
+						}
+					}
+				}
 			}
-		]
-	},
+		}
+	],
+	"group_targeting-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : false,
+							"otherField" : true,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						{
+							"$const" : 1
+						}
+					]
+				},
+				"otherField" : {
+					"$top" : {
+						"output" : "$otherField",
+						"sortBy" : {
+							"shardKey" : 1
+						}
+					}
+				}
+			}
+		}
+	],
 	"mergeType" : "router",
 	"mergerPart" : [
 		{
@@ -1213,40 +1311,76 @@
 ### Summarized explain
 ```json
 {
-	"group_targeting-rs0" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+	"group_targeting-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : true,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
 			}
-		]
-	},
-	"group_targeting-rs1" : {
-		"rejectedPlans" : [ ],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"direction" : "forward",
-				"filter" : { },
-				"nss" : "test.group_targeting",
-				"stage" : "COLLSCAN"
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						"$_id"
+					]
+				}
 			}
-		]
-	},
+		}
+	],
+	"group_targeting-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : true,
+							"shardKey" : true
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"direction" : "forward",
+						"filter" : { },
+						"nss" : "test.group_targeting",
+						"stage" : "COLLSCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : {
+					"$min" : [
+						"$shardKey",
+						"$_id"
+					]
+				}
+			}
+		}
+	],
 	"mergeType" : "router",
 	"mergerPart" : [
 		{

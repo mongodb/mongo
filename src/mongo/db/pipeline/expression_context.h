@@ -69,9 +69,6 @@ namespace mongo {
 enum struct SbeCompatibility {
     // Not implemented in SBE.
     notCompatible,
-    // Requires "featureFlagSbeFull" to be set. New SBE features which are under
-    // development can live under this feature flag until they are ready to be shipped.
-    requiresSbeFull,
     // Requires the framework control knob to be "trySbeEngine". Fully tested, complete
     // SBE features belong here.
     requiresTrySbe,

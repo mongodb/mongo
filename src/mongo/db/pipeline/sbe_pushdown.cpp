@@ -379,7 +379,6 @@ void removeUnpackBucketFollowedByUnsupportedStages(
  * second pass takes off any stages that may not benefit from execution in SBE.
  */
 void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
-                         SbeCompatibility minRequiredCompatibility,
                          bool allStagesPushedDown,
                          bool unpackBucketPruningDisabled) {
     // First, scan the list of stages for pushdown, and remove an unpack bucket (plus anything
@@ -392,16 +391,11 @@ void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stag
     bool prunedThisIteration;  // were any stages pruned in the current loop iteration?
     do {
         prunedThisIteration = false;
-        if (SbeCompatibility::requiresSbeFull >= minRequiredCompatibility) {
-            // When 'minRequiredCompatibility' is permissive enough (because featureFlagSbeFull is
-            // enabled), do not remove trailing $addFields stages.
-        } else {
-            // Otherwise, remove trailing $addFields stages that we don't expect to improve
-            // performance when they execute in SBE.
-            if (pruneTrailingAddFields(stagesForPushdown, allStagesPushedDown && !pruned)) {
-                prunedThisIteration = true;
-                pruned = true;
-            }
+        // Remove trailing $addFields stages that we don't expect to improve performance when they
+        // execute in SBE.
+        if (pruneTrailingAddFields(stagesForPushdown, allStagesPushedDown && !pruned)) {
+            prunedThisIteration = true;
+            pruned = true;
         }
 
         // $unwind should not be the last stage pushed down as it is more expensive in SBE.
@@ -670,7 +664,6 @@ bool findSbeCompatibleStagesForPushdown(
 
     // Remove stage patterns where pushing down may degrade performance.
     prunePushdownStages(stagesForPushdown,
-                        minRequiredCompatibility,
                         allStagesPushedDown,
                         cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
                             feature_flags::gFeatureFlagSbeDisableUnpackBucketPruning));

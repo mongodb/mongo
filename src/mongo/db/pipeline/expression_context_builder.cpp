@@ -295,7 +295,6 @@ std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat) {
         return os;                         \
     }
         CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::notCompatible)
-        CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::requiresSbeFull)
         CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::requiresTrySbe)
         CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::noRequirements)
 #undef CASE_SBE_COMPAT_OSTREAM
