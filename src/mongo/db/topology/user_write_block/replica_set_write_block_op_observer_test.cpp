@@ -77,7 +77,7 @@ class PauseAutoCompactThrowsStorageEngine final : public StorageEngineMock {
 public:
     Status tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext*) override {
         ++_attempts;
-        return {ErrorCodes::ObjectIsBusy, "auto-compact reconfigure is busy"};
+        uasserted(ErrorCodes::ObjectIsBusy, "auto-compact reconfigure is busy");
     }
 
     int attempts() const {
