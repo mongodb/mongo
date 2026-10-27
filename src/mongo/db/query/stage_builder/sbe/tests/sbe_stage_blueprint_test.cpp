@@ -15,6 +15,7 @@
 #include <memory>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -40,6 +41,101 @@ TEST(SbBlueprintTest, AddReturnsIndexOfNewNode) {
     ASSERT_EQ(blueprint.add(SbBlueprintCoScan{}).value, 1u);
     ASSERT_EQ(blueprint.size(), 2u);
     ASSERT_TRUE(std::holds_alternative<SbBlueprintCoScan>(blueprint[SbBlueprintNodeIdx{1}]));
+}
+
+TEST(SbBlueprintChildTest, LeafHasNoChildren) {
+    SbBlueprintNode node = SbBlueprintCoScan{};
+    ASSERT_EQ(numChildren(node), 0u);
+}
+
+TEST(SbBlueprintChildTest, GetAndSetOnlyChild) {
+    SbBlueprintNode node = SbBlueprintFilter{.child = SbBlueprintNodeIdx{3}};
+    ASSERT_EQ(numChildren(node), 1u);
+    ASSERT_EQ(getChild(node, 0), SbBlueprintNodeIdx{3});
+
+    setChild(node, 0, SbBlueprintNodeIdx{5});
+    ASSERT_EQ(getChild(node, 0), SbBlueprintNodeIdx{5});
+    ASSERT_EQ(std::get<SbBlueprintFilter>(node).child, SbBlueprintNodeIdx{5});
+    ASSERT_EQ(childField(node, 0), &std::get<SbBlueprintFilter>(node).child);
+}
+
+TEST(SbBlueprintChildTest, GetAndSetEachOfTwoChildren) {
+    SbBlueprintNode node =
+        SbBlueprintLoopJoin{.outer = SbBlueprintNodeIdx{1}, .inner = SbBlueprintNodeIdx{2}};
+    ASSERT_EQ(numChildren(node), 2u);
+    ASSERT_EQ(getChild(node, 0), SbBlueprintNodeIdx{1});
+    ASSERT_EQ(getChild(node, 1), SbBlueprintNodeIdx{2});
+
+    setChild(node, 1, SbBlueprintNodeIdx{4});
+    auto& join = std::get<SbBlueprintLoopJoin>(node);
+    ASSERT_EQ(join.outer, SbBlueprintNodeIdx{1});
+    ASSERT_EQ(join.inner, SbBlueprintNodeIdx{4});
+}
+
+TEST(SbBlueprintChildTest, GetAndSetInAChildVector) {
+    SbBlueprintNode node = SbBlueprintUnion{
+        .children = {SbBlueprintNodeIdx{1}, SbBlueprintNodeIdx{2}, SbBlueprintNodeIdx{3}},
+        .inputSlots = {{10}, {11}, {12}},
+        .outputSlots = {20}};
+    ASSERT_EQ(numChildren(node), 3u);
+    ASSERT_EQ(getChild(node, 2), SbBlueprintNodeIdx{3});
+
+    setChild(node, 1, SbBlueprintNodeIdx{7});
+    auto& children = std::get<SbBlueprintUnion>(node).children;
+    ASSERT_EQ(children[0], SbBlueprintNodeIdx{1});
+    ASSERT_EQ(children[1], SbBlueprintNodeIdx{7});
+    ASSERT_EQ(children[2], SbBlueprintNodeIdx{3});
+}
+
+TEST(SbBlueprintChildTest, GetAndSetThroughInfo) {
+    // Hash join keeps its children in the separately allocated 'info' struct.
+    auto info = std::make_unique<SbBlueprintHashJoinInfo>();
+    info->outer = SbBlueprintNodeIdx{1};
+    info->inner = SbBlueprintNodeIdx{2};
+    SbBlueprintNode node = SbBlueprintHashJoin{.info = std::move(info)};
+    ASSERT_EQ(numChildren(node), 2u);
+    ASSERT_EQ(getChild(node, 0), SbBlueprintNodeIdx{1});
+
+    setChild(node, 0, SbBlueprintNodeIdx{9});
+    ASSERT_EQ(std::get<SbBlueprintHashJoin>(node).info->outer, SbBlueprintNodeIdx{9});
+    ASSERT_EQ(getChild(node, 1), SbBlueprintNodeIdx{2});
+}
+
+void assertChildOrderMatchesForEachChild(SbBlueprintNode node) {
+    std::vector<SbBlueprintNodeIdx> visited;
+    forEachChild(node, [&](SbBlueprintNodeIdx& child) { visited.push_back(child); });
+    ASSERT_EQ(visited.size(), numChildren(node));
+    for (size_t i = 0; i < visited.size(); ++i) {
+        ASSERT_EQ(getChild(node, i), visited[i]);
+    }
+}
+
+TEST(SbBlueprintChildTest, ChildOrderMatchesForEachChild) {
+    assertChildOrderMatchesForEachChild(
+        SbBlueprintBranch{.thenChild = SbBlueprintNodeIdx{1}, .elseChild = SbBlueprintNodeIdx{2}});
+    assertChildOrderMatchesForEachChild(SbBlueprintHashLookup{
+        .localStage = SbBlueprintNodeIdx{1}, .foreignStage = SbBlueprintNodeIdx{2}});
+}
+
+DEATH_TEST(SbBlueprintChildDeathTest, GetChildOfLeafFails, "13778603") {
+    SbBlueprintNode node = SbBlueprintCoScan{};
+    getChild(node, 0);
+}
+
+DEATH_TEST(SbBlueprintChildDeathTest, NumChildrenOfLoweredNodeFails, "13778604") {
+    SbBlueprintNode node = SbBlueprintLowered{};
+    numChildren(node);
+}
+
+DEATH_TEST(SbBlueprintChildDeathTest, GetChildOfLoweredNodeFails, "13778605") {
+    SbBlueprintNode node = SbBlueprintLowered{};
+    getChild(node, 0);
+}
+
+DEATH_TEST(SbBlueprintChildDeathTest, SetChildPastTheEndFails, "13778601") {
+    SbBlueprintNode node =
+        SbBlueprintLoopJoin{.outer = SbBlueprintNodeIdx{1}, .inner = SbBlueprintNodeIdx{2}};
+    setChild(node, 2, SbBlueprintNodeIdx{3});
 }
 
 TEST(SbStageTest, HandleIsEmptyAfterMoveAndRelease) {

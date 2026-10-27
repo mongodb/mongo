@@ -1557,4 +1557,37 @@ inline PlanNodeId getNodeId(const SbBlueprintNode& node) {
                       node);
 }
 
+/**
+ * Calls 'fn' on the field of 'node' that holds each child, in order.
+ */
+template <typename F>
+void forEachChild(SbBlueprintNode& node, F&& fn) {
+    std::visit([&](auto& n) { n.visitChildren(fn); }, node);
+}
+
+/**
+ * Returns the number of children of 'node'.
+ */
+size_t numChildren(SbBlueprintNode& node);
+
+/**
+ * Returns a pointer to the field of 'node' that holds its child at position 'childIdx', in the
+ * order forEachChild() visits the children. Never returns nullptr.
+ */
+SbBlueprintNodeIdx* childField(SbBlueprintNode& node, size_t childIdx);
+
+/**
+ * Returns the child of 'node' at position 'childIdx'.
+ */
+inline SbBlueprintNodeIdx getChild(SbBlueprintNode& node, size_t childIdx) {
+    return *childField(node, childIdx);
+}
+
+/**
+ * Makes 'newChild' the child of 'node' at position 'childIdx'.
+ */
+inline void setChild(SbBlueprintNode& node, size_t childIdx, SbBlueprintNodeIdx newChild) {
+    *childField(node, childIdx) = newChild;
+}
+
 }  // namespace mongo::stage_builder
