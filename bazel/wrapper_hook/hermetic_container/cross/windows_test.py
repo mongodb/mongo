@@ -238,7 +238,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn("--remote_default_exec_properties=dockerNetwork=standard", args)
         self.assertIn("--remote_default_exec_properties=Pool=x86_64", args)
         self.assertNotIn("--//bazel/config:remote_link=True", args)
-        self.assertIn("--spawn_strategy=local", args)
+        self.assertIn("--spawn_strategy=remote,local", args)
         self.assertIn("--strategy=CppCompile=remote", args)
         self.assertIn("--strategy=CppLink=persistent-container", args)
         self.assertIn("--strategy=CppArchive=remote", args)
@@ -1420,6 +1420,31 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
 class WindowsPersistentContainerPlanningTest(unittest.TestCase):
     containers = {"ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"}}
+
+    def test_linux_build_tools_default_to_remote_execution(self):
+        for link_options in ([], ["--config=remote_link"]):
+            with self.subTest(link_options=link_options):
+                args = cross_windows._windows_cross_host_wrapper_action_args(
+                    ["build", *link_options, "//src/mongo/scripting/mozjs/wasm:mozjs_wasm_api"],
+                    {},
+                    self.containers,
+                )
+                self.assertIn("--spawn_strategy=remote,local", args)
+                self.assertNotIn("--spawn_strategy=local", args)
+                self.assertIn("--strategy=MongoInstallRule=local", args)
+                self.assertIn("--strategy=TestRunner=standalone", args)
+
+    def test_linux_shell_genrules_execute_remotely(self):
+        for link_options in ([], ["--config=remote_link"]):
+            with self.subTest(link_options=link_options):
+                args = cross_windows._windows_cross_host_wrapper_action_args(
+                    ["build", *link_options, "//src/third_party/mozjs:mozjs"],
+                    {},
+                    self.containers,
+                )
+                self.assertIn("--shell_executable=/bin/bash", args)
+                # The Windows client cannot run the Linux shell selected for genrules.
+                self.assertIn("--strategy=Genrule=remote", args)
 
     def test_unix_root_preserves_startup_options_and_is_idempotent(self):
         original = [

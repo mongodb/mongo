@@ -1,8 +1,11 @@
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
-load(":wasi_repo_test.bzl", "wasi_repo_test_suite")
+load(":wasi_repo_test.bzl", "linux_tool_wrapper_fixture", "wasi_repo_test_suite")
 
 package(default_visibility = ["//visibility:public"])
+
+exports_files(["linux_tool_wrapper.sh"])
 
 # --- WASI Preview2 (wasm32-wasip2) toolchain/platform ---
 
@@ -11,6 +14,32 @@ wasi_cc_toolchain_config_wasip2(
     ar = "@wasi_sdk//:llvm-ar",
     clang = "@wasi_sdk//:wasm32-wasip2-clang",
     clangpp = "@wasi_sdk//:wasm32-wasip2-clang++",
+)
+
+linux_tool_wrapper_fixture(
+    name = "wasi_tool_wrapper_fixture",
+    testonly = True,
+)
+
+sh_test(
+    name = "wasi_tool_wrapper_test",
+    srcs = ["wasi_tool_wrapper_test.sh"],
+    args = [
+        "$(location @wasi_sdk//:wasm32-wasip2-clang)",
+        "$(location :wasi_tool_wrapper_fixture/bin/mongo-wasm32-wasip2-clang)",
+        "$(location :wasi_tool_wrapper_fixture/bin/mongo-wasm32-wasip2-clang++)",
+        "$(location :wasi_tool_wrapper_fixture/bin/mongo-llvm-ar)",
+    ],
+    data = [
+        ":wasi_tool_wrapper_fixture/bin/mongo-llvm-ar",
+        ":wasi_tool_wrapper_fixture/bin/mongo-wasm32-wasip2-clang",
+        ":wasi_tool_wrapper_fixture/bin/mongo-wasm32-wasip2-clang++",
+        "@wasi_sdk//:bin",
+        "@wasi_sdk//:lib",
+        "@wasi_sdk//:share",
+        "@wasi_sdk//:wasm32-wasip2-clang",
+    ],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 cc_toolchain(

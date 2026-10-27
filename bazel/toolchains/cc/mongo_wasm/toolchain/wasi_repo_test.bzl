@@ -1,9 +1,38 @@
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
     ":wasi_repo.bzl",
+    "LINUX_TOOL_WRAPPER_TEMPLATE",
     "WASI_SDK_DIST",
     "cross_execution_arch",
+    "linux_tool_wrapper_substitutions",
     "wasi_execution_arch",
+)
+
+def _linux_tool_wrapper_fixture_impl(ctx):
+    wrappers = [ctx.outputs.clang, ctx.outputs.clangpp, ctx.outputs.ar]
+    substitutions = linux_tool_wrapper_substitutions()
+    for wrapper in wrappers:
+        ctx.actions.expand_template(
+            template = ctx.file._wrapper_template,
+            output = wrapper,
+            substitutions = substitutions[wrapper.basename],
+            is_executable = True,
+        )
+    return [DefaultInfo(files = depset(wrappers))]
+
+linux_tool_wrapper_fixture = rule(
+    implementation = _linux_tool_wrapper_fixture_impl,
+    attrs = {
+        "_wrapper_template": attr.label(
+            default = LINUX_TOOL_WRAPPER_TEMPLATE,
+            allow_single_file = True,
+        ),
+    },
+    outputs = {
+        "clang": "%{name}/bin/mongo-wasm32-wasip2-clang",
+        "clangpp": "%{name}/bin/mongo-wasm32-wasip2-clang++",
+        "ar": "%{name}/bin/mongo-llvm-ar",
+    },
 )
 
 def _fake_repository_context(environ, arch, name = "linux"):
@@ -70,6 +99,34 @@ _wasi_sdk_dist_test = unittest.make(_wasi_sdk_dist_test_impl)
 
 def _wasi_execution_arch_test_impl(ctx):
     env = unittest.begin(ctx)
+
+    # A Windows client can hydrate an SDK that executes on Linux workers.
+    asserts.equals(
+        env,
+        "amd64",
+        wasi_execution_arch(_fake_repository_context({
+            "MONGO_BAZEL_WASI_SDK_OS": "linux",
+        }, "x86_64", name = "windows")),
+    )
+
+    # Canonical OS overrides use the SDK's architecture spelling, even when
+    # the Bazel client runs on another OS.
+    for host_os in ("linux", "mac os x"):
+        asserts.equals(
+            env,
+            "x86_64",
+            wasi_execution_arch(_fake_repository_context({
+                "MONGO_BAZEL_WASI_SDK_OS": "macos",
+            }, "x86_64", name = host_os)),
+        )
+        asserts.equals(
+            env,
+            "x86_64",
+            wasi_execution_arch(_fake_repository_context({
+                "MONGO_BAZEL_WASI_SDK_OS": "macos",
+                "MONGO_WASI_SDK_EXEC_ARCH": "amd64",
+            }, "aarch64", name = host_os)),
+        )
 
     # The direct execution override is the source of truth and wins over a
     # stale selector during repository hydration.

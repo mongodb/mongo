@@ -75,7 +75,7 @@ load(
     "use_wiredtiger",
     "visibility_support",
 )
-load(":py_action_env_test.bzl", "runtime_pythonpath_test", "template_renderer_python_path_analysis_test")
+load(":py_action_env_test.bzl", "linux_tool_path_analysis_test", "runtime_pythonpath_test", "template_renderer_python_path_analysis_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -185,6 +185,27 @@ runtime_pythonpath_test(name = "runtime_pythonpath_test")
 template_renderer_python_path_analysis_test(
     name = "template_renderer_python_path_analysis_test",
     target_under_test = "//src/mongo/base:error_codes_source",
+)
+
+linux_tool_path_analysis_test(
+    name = "template_renderer_linux_path_analysis_test",
+    action_mnemonic = "TemplateRenderer",
+    target_compatible_with = ["@platforms//os:linux"],
+    target_under_test = "//src/mongo/base:error_codes_source",
+)
+
+linux_tool_path_analysis_test(
+    name = "config_header_linux_path_analysis_test",
+    action_mnemonic = "ConfigHeaderGen",
+    target_compatible_with = ["@platforms//os:linux"],
+    target_under_test = "//src/mongo:mongo_config_header",
+)
+
+linux_tool_path_analysis_test(
+    name = "python_genrule_linux_path_analysis_test",
+    action_mnemonic = "TemplateRenderer",
+    target_compatible_with = ["@platforms//os:linux"],
+    target_under_test = "//src/mongo/db/extension/extensions:download_mongot_extension_amazon2023-x86_64",
 )
 
 # Compilation database generation only builds command fragments and their inputs.

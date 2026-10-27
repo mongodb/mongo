@@ -73,5 +73,31 @@ class WindowsCrossExecutionPlatformTest(unittest.TestCase):
                 self.namespace["_write_windows_cross_execution_platform"](ctx)
 
 
+class WindowsCrossInheritedPlatformFlagsTest(unittest.TestCase):
+    def test_compiler_flag_resolves_from_the_generated_execution_repository(self):
+        path = Path(__file__).with_name("platform_util.bzl")
+        tree = ast.parse(path.read_text())
+        helper = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "setup_platform"
+        )
+        native_platform = mock.Mock()
+        namespace = {
+            "native": SimpleNamespace(platform=native_platform),
+            "REMOTE_EXECUTION_CONTAINERS": {"ubuntu24": {"container-url": "docker://image"}},
+        }
+        exec(compile(ast.Module(body=[helper], type_ignores=[]), str(path), "exec"), namespace)
+        namespace["setup_platform"]("amd64", "ubuntu24", "")
+        execution_platform = native_platform.call_args.kwargs
+        self.assertEqual(execution_platform["name"], "ubuntu24_amd64_windows_cross_exec")
+        compiler_flag = next(
+            flag for flag in execution_platform["flags"] if "compiler_type=" in flag
+        )
+        # Bazel parses inherited flags in the child platform's repository. An explicit
+        # main-repository qualifier keeps this flag usable from windows_cross:exec.
+        self.assertEqual(compiler_flag, "--@//bazel/config:compiler_type=clang")
+
+
 if __name__ == "__main__":
     unittest.main()

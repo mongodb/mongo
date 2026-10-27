@@ -41,8 +41,10 @@ WASI_SDK_DIST = {
     },
 }
 
+_WASI_SDK_OS_ENV = "MONGO_BAZEL_WASI_SDK_OS"
+
 def _normalize_os(name):
-    if name.startswith("mac os"):
+    if name == "macos" or name.startswith("mac os"):
         return "macos"
     if name.startswith("windows"):
         return "windows"
@@ -87,7 +89,8 @@ def cross_execution_arch(selector):
 def wasi_execution_arch(rctx):
     """Select an SDK executable architecture, independent of the target CPU."""
 
-    os = _normalize_os(rctx.os.name)
+    requested_os = rctx.os.environ.get(_WASI_SDK_OS_ENV, "")
+    os = _normalize_os(requested_os) if requested_os else _normalize_os(rctx.os.name)
 
     # The explicit execution override is authoritative.  tools/bazel adds it
     # before bootstrap and the cross-RBE hook adds it to the final invocation,
@@ -112,8 +115,39 @@ def wasi_execution_arch(rctx):
     # substitute an x86_64/aarch64 executable for a native IBM SDK.
     return _normalize_execution_arch(_normalize_arch(rctx.os.arch), os)
 
+LINUX_TOOL_WRAPPER_TEMPLATE = Label(":linux_tool_wrapper.sh")
+
+def linux_tool_wrapper_substitutions():
+    """Return template substitutions used by the repository and test fixture."""
+    return {
+        wrapper: {
+            "@MONGO_WASI_REAL_TOOL@": real_tool,
+            "@MONGO_WASI_ARGV0@": argv0,
+        }
+        for wrapper, real_tool, argv0 in [
+            ("mongo-wasm32-wasip2-clang", "clang-22", "wasm32-wasip2-clang"),
+            ("mongo-wasm32-wasip2-clang++", "clang-22", "wasm32-wasip2-clang++"),
+            ("mongo-llvm-ar", "llvm-ar", "llvm-ar"),
+        ]
+    }
+
+def _write_linux_tool_wrappers(rctx):
+    """Creates executable entrypoints for Linux tools downloaded on Windows."""
+    for wrapper, substitutions in linux_tool_wrapper_substitutions().items():
+        rctx.template(
+            "bin/" + wrapper,
+            template = LINUX_TOOL_WRAPPER_TEMPLATE,
+            substitutions = substitutions,
+            executable = True,
+        )
+
 def _setup_wasi_deps(rctx):
-    os = _normalize_os(rctx.os.name)
+    # Repository rules run on the Bazel client, while WASI compile actions may
+    # run on a different execution platform. Windows cross builds execute
+    # these actions in Linux RBE containers, so use the Linux SDK there rather
+    # than passing Windows .exe tools to the remote worker.
+    requested_os = rctx.getenv(_WASI_SDK_OS_ENV)
+    os = _normalize_os(requested_os) if requested_os else _normalize_os(rctx.os.name)
     arch = wasi_execution_arch(rctx)
     key = (os, arch)
 
@@ -174,9 +208,23 @@ esac
         "share/wasi-sysroot/include/c++/v1/nonexistent.txt",
     )
 
-    # On Windows the binaries have .exe suffixes. Create wrapper scripts so
-    # the toolchain config can use the same label on all platforms.
+    # On Windows the binaries have .exe suffixes. Create aliases so the
+    # toolchain config can use the same labels on all platforms.
     exe = ".exe" if os == "windows" else ""
+    if os == "linux" and _normalize_os(rctx.os.name) == "windows":
+        # A Linux SDK downloaded by a Windows Bazel client can lose Unix
+        # executable bits and symlink behavior in the local repository. These
+        # generated entrypoints are executable Bazel inputs, copy the real
+        # binaries to a writable path with the correct mode inside the RBE
+        # action, and preserve Clang's driver name through argv[0].
+        _write_linux_tool_wrappers(rctx)
+        clang = "bin/mongo-wasm32-wasip2-clang"
+        clangpp = "bin/mongo-wasm32-wasip2-clang++"
+        ar = "bin/mongo-llvm-ar"
+    else:
+        clang = "bin/wasm32-wasip2-clang" + exe
+        clangpp = "bin/wasm32-wasip2-clang++" + exe
+        ar = "bin/llvm-ar" + exe
 
     rctx.file(
         "BUILD.bazel",
@@ -190,10 +238,10 @@ filegroup(name = "share",   srcs = glob(["share/**"]))
 
 # Platform-independent aliases for the WASI SDK tools so the toolchain
 # config can use the same labels on Linux, macOS, and Windows.
-alias(name = "wasm32-wasip2-clang",   actual = "bin/wasm32-wasip2-clang{exe}")
-alias(name = "wasm32-wasip2-clang++", actual = "bin/wasm32-wasip2-clang++{exe}")
-alias(name = "llvm-ar",               actual = "bin/llvm-ar{exe}")
-        """.format(exe = exe),
+alias(name = "wasm32-wasip2-clang",   actual = "{clang}")
+alias(name = "wasm32-wasip2-clang++", actual = "{clangpp}")
+alias(name = "llvm-ar",               actual = "{ar}")
+        """.format(clang = clang, clangpp = clangpp, ar = ar),
     )
 
 setup_wasi_deps = repository_rule(
@@ -208,5 +256,5 @@ setup_wasi_deps = repository_rule(
     # re-evaluated when the cross execution platform changes even though the
     # target platform remains wasm32.
     configure = True,
-    environ = [_LINUX_CROSS_TOOLCHAIN_ENV, _WASI_SDK_EXEC_ARCH_ENV],
+    environ = [_LINUX_CROSS_TOOLCHAIN_ENV, _WASI_SDK_EXEC_ARCH_ENV, _WASI_SDK_OS_ENV],
 )

@@ -48,3 +48,23 @@ def _template_renderer_python_path_test_impl(ctx):
 template_renderer_python_path_analysis_test = analysistest.make(
     _template_renderer_python_path_test_impl,
 )
+
+def _linux_tool_path_analysis_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = [
+        action
+        for action in analysistest.target_actions(env)
+        if action.mnemonic == ctx.attr.action_mnemonic
+    ]
+    asserts.equals(env, 1, len(actions))
+    asserts.equals(env, "/usr/bin:/bin", actions[0].env.get("PATH"))
+    return analysistest.end(env)
+
+linux_tool_path_analysis_test = analysistest.make(
+    _linux_tool_path_analysis_test_impl,
+    attrs = {"action_mnemonic": attr.string(mandatory = True)},
+    config_settings = {
+        "@@//bazel/config:windows_cross_host_path": "C:/Windows;C:/Python",
+        "//command_line_option:action_env": ["PATH=/usr/bin:/bin"],
+    },
+)

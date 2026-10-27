@@ -12,9 +12,10 @@ def python_genrule_impl(ctx):
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
     env = py_action_env_pythonpath(ctx, ctx.attr.python_binary, runfiles_package_dir)
-    env.update(py_action_env_windows_dll_path(ctx))
+    windows_python_env = py_action_env_windows_dll_path(ctx)
+    env.update(windows_python_env)
     windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
-    if windows_cross_host_path:
+    if windows_cross_host_path and windows_python_env:
         env["PATH"] = windows_cross_host_path
 
     ctx.actions.run(

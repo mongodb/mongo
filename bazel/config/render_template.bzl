@@ -5,9 +5,12 @@ load("@rules_python//python:defs.bzl", "py_binary")
 
 def _python_action_env(ctx, python_path):
     env = py_action_env_pythonpath(ctx, ctx.attr.python_binary, python_path)
-    env.update(py_action_env_windows_dll_path(ctx))
+    windows_python_env = py_action_env_windows_dll_path(ctx)
+    env.update(windows_python_env)
     windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
-    if windows_cross_host_path:
+
+    # Linux execution runtimes must keep the worker's PATH rather than the client path.
+    if windows_cross_host_path and windows_python_env:
         env["PATH"] = windows_cross_host_path
     return env
 

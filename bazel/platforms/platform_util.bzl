@@ -29,7 +29,9 @@ def setup_platform(arch, distro_or_os, cache_silo, name_suffix = "", extra_const
             name = distro_or_os + "_" + arch + cache_silo + "_windows_cross_exec",
             parents = [":" + distro_or_os + "_" + arch + cache_silo],
             flags = [
-                "--//bazel/config:compiler_type=clang",
+                # Inherited flags are parsed in the child platform's repository.
+                # The Windows wrapper's generated execution platform is external.
+                "--@//bazel/config:compiler_type=clang",
                 "--@rules_rust//rust/settings:toolchain_linker_preference=cc",
             ],
         )

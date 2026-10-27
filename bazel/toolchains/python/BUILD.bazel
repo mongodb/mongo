@@ -1,0 +1,10 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "python_toolchain_test",
+    srcs = ["python_toolchain_test.py"],
+    data = [
+        "python_toolchain.BUILD.tmpl",
+        "python_toolchain.bzl",
+    ],
+)

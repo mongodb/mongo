@@ -111,12 +111,11 @@ def generate_config_header_impl(ctx):
         variables = compile_variables,
     )
 
-    # Native Windows py_binary launchers need the Python DLL directory on
-    # PATH. Windows cross actions instead need the explicitly configured
-    # host path, which takes precedence when cross mode is enabled.
+    # Windows runtimes need the Python DLL directory or the configured host PATH.
+    # Linux execution runtimes must retain the worker's PATH.
     action_env = py_action_env_windows_dll_path(ctx)
     windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
-    if windows_cross_host_path:
+    if windows_cross_host_path and action_env:
         action_env["PATH"] = windows_cross_host_path
 
     expanded_extra_definitions = {}

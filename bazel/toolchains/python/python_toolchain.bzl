@@ -168,6 +168,12 @@ toolchain(
         stripPrefix = "python",
     )
 
+    if is_host_windows and is_toolchain_linux:
+        # Linux terminfo aliases that differ only by case become symlink cycles on
+        # Windows filesystems. Build-time Python does not need this terminal database,
+        # and excluding it from glob() does not prevent traversal of the cycles.
+        ctx.delete("dist/share/terminfo")
+
     windows_python = False
     for name in ctx.path("dist").readdir():
         if name.basename == "python.exe":

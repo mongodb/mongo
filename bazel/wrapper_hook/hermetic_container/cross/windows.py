@@ -662,6 +662,8 @@ def _windows_cross_host_wrapper_action_args(
                     "//bazel/platforms:windows_x86_64_cross",
                 ]
             ),
+            "--repo_env=MONGO_BAZEL_WASI_SDK_OS=linux",
+            "--repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64",
             "--repo_env=MONGO_BAZEL_TOOLCHAIN_OS=linux",
             "--repo_env=MONGO_BAZEL_TOOLCHAIN_ARCH=x86_64",
             f"--repo_env=MONGO_BAZEL_TOOLCHAIN_DISTRO={_windows_cross_rbe_distro(selection_env, containers)}",
@@ -669,7 +671,9 @@ def _windows_cross_host_wrapper_action_args(
             f"--action_env=PATH={_windows_cross_action_path(env)}",
             f"--host_action_env=PATH={_windows_cross_action_path(env)}",
             "--strategy=MongoInstallRule=local",
-            "--spawn_strategy=local",
+            # Build tools target the Linux execution platform, including Python and Rust
+            # helper actions. Native Windows installation/debug actions stay local below.
+            "--spawn_strategy=remote,local",
             "--strategy=CppCompile=remote",
             *link_options,
             "--strategy=CppArchive=remote",
@@ -680,6 +684,9 @@ def _windows_cross_host_wrapper_action_args(
             "--strategy=CcGenerateDwp=local",
             "--strategy=ConfigHeaderGen=remote",
             "--strategy=IdlcGenerator=remote",
+            # Genrules use the Linux execution platform's shell, including third-party
+            # header-copy actions, so they cannot run on the Windows client.
+            "--strategy=Genrule=remote",
             "--strategy=WindowsRC=remote",
             "--features=-thin_archive",
             "--test_strategy=standalone",
