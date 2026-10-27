@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
@@ -130,6 +131,103 @@ void BM_KeyStringToBSON(benchmark::State& state,
     state.SetItemsProcessed(state.iterations() * kSampleSize);
 }
 
+class NoOpBuilderImpl : public key_string::BuilderInterface {
+public:
+    void append(const MinKeyLabeler& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const MaxKeyLabeler& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const NullLabeler& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const UndefinedLabeler& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(bool v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const Date_t& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const Timestamp& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const OID& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const std::string& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(std::string_view v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONSymbol& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONCode& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONCodeWScope& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONBinData& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONRegEx& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const BSONDBRef& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(double v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(const Decimal128& v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(long long v) override {
+        benchmark::DoNotOptimize(v);
+    }
+    void append(int32_t v) override {
+        benchmark::DoNotOptimize(v);
+    }
+
+    BufBuilder& subobjStart() override {
+        return _builder;
+    }
+    BufBuilder& subarrayStart() override {
+        return _builder;
+    }
+
+private:
+    BufBuilder _builder{0};
+};
+
+void BM_KeyStringReadValue(benchmark::State& state,
+                           const key_string::Version version,
+                           BsonValueType bsonType) {
+    const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        for (size_t i = 0; i < kSampleSize; i++) {
+            auto& typeBits = bsonsAndKeyStrings.typebits[i];
+            BufReader typeBitsBuf(typeBits.data(), typeBits.size());
+            auto typeBitsReader = key_string::TypeBits::getReaderFromBuffer(version, &typeBitsBuf);
+
+            BufReader reader(bsonsAndKeyStrings.keystrings[i].data(),
+                             bsonsAndKeyStrings.keystrings[i].size());
+            NoOpBuilderImpl stream;
+            while (key_string::readValue(
+                &reader, &typeBitsReader, /*inverted=*/false, version, &stream)) {
+            }
+        }
+    }
+    state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
+    state.SetItemsProcessed(state.iterations() * kSampleSize);
+}
+
 void BM_KeyStringValueAssign(benchmark::State& state, BsonValueType bsonType) {
     // The KeyString version does not matter for this test.
     const auto version = key_string::Version::V1;
@@ -240,6 +338,16 @@ BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_String, key_string::Version::V0, STRING
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_String, key_string::Version::V1, STRING);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Array, key_string::Version::V0, ARRAY);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Array, key_string::Version::V1, ARRAY);
+
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V0_Int, key_string::Version::V0, INT);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V1_Int, key_string::Version::V1, INT);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V0_Double, key_string::Version::V0, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V1_Double, key_string::Version::V1, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V1_Decimal, key_string::Version::V1, DECIMAL);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V0_String, key_string::Version::V0, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V1_String, key_string::Version::V1, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V0_Array, key_string::Version::V0, ARRAY);
+BENCHMARK_CAPTURE(BM_KeyStringReadValue, V1_Array, key_string::Version::V1, ARRAY);
 
 BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 16B, 16);
 BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 512B, 512);
