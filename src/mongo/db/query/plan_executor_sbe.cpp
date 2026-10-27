@@ -402,8 +402,10 @@ Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
         case sbe::value::TypeTags::StringSmall:
         case sbe::value::TypeTags::StringBig:
         case sbe::value::TypeTags::bsonString:
-        case sbe::value::TypeTags::bsonSymbol:
             return Value(sbe::value::getStringOrSymbolView(tag, val));
+
+        case sbe::value::TypeTags::bsonSymbol:
+            return Value(BSONSymbol(sbe::value::getStringOrSymbolView(tag, val)));
 
         case sbe::value::TypeTags::Array:
         case sbe::value::TypeTags::ArraySet:
@@ -453,7 +455,7 @@ Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
         }
 
         case sbe::value::TypeTags::bsonJavascript:
-            return Value(sbe::value::getBsonJavascriptView(val));
+            return Value(BSONCode(sbe::value::getBsonJavascriptView(val)));
 
         case sbe::value::TypeTags::bsonDBPointer: {
             auto dbptr = sbe::value::getBsonDBPointerView(val);
