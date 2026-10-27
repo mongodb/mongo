@@ -215,8 +215,7 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode) noexcept override;
 
     void onReshardingFieldsChanges(OperationContext* opCtx,
-                                   const TypeCollectionReshardingFields& reshardingFields,
-                                   bool noChunksToCopy);
+                                   const TypeCollectionReshardingFields& reshardingFields);
 
     /**
      * Fulfills the subset of recipient promises that are driven by the coordinator advancing

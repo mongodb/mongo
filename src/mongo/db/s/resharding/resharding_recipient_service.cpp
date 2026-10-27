@@ -829,9 +829,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
-    OperationContext* opCtx,
-    const TypeCollectionReshardingFields& reshardingFields,
-    bool noChunksToCopy) {
+    OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     // onReshardingFieldsChanges is driven by shard version refreshes. In the authoritative path,
     // the coordinator drives participant state directly so this method must never be reached.
     tassert(12862901,
@@ -846,29 +844,10 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     std::lock_guard<std::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-    auto driveCloneViaRefresh = !resharding::isEnabledWithPinnedVersion(
-        _forwardableOpMetadata, resharding::gFeatureFlagReshardingCloneNoRefresh);
-
-    boost::optional<CloneDetails> cloneDetails;
-    if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
-        auto recipientFields = *reshardingFields.getRecipientFields();
-        invariant(recipientFields.getCloneTimestamp());
-        invariant(recipientFields.getApproxDocumentsToCopy());
-        invariant(recipientFields.getApproxBytesToCopy());
-        if (_skipCloningAndApplying || _skipCloning) {
-            invariant(noChunksToCopy);
-        }
-
-        int64_t approxDocumentsToCopy =
-            noChunksToCopy ? 0 : *recipientFields.getApproxDocumentsToCopy();
-        int64_t approxBytesToCopy = noChunksToCopy ? 0 : *recipientFields.getApproxBytesToCopy();
-        cloneDetails = CloneDetails{*recipientFields.getCloneTimestamp(),
-                                    approxDocumentsToCopy,
-                                    approxBytesToCopy,
-                                    recipientFields.getDonorShards()};
-    }
-
-    _onCoordinatorStateAdvanced(lk, coordinatorState, std::move(cloneDetails));
+    // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so a shard version
+    // refresh never drives cloning; the coordinator drives it directly through
+    // onCoordinatorStateAdvanced().
+    _onCoordinatorStateAdvanced(lk, coordinatorState, /*cloneDetails=*/boost::none);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onCoordinatorStateAdvanced(

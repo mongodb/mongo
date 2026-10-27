@@ -460,18 +460,6 @@ public:
         ASSERT(!expectDonorStateMachine || fieldsValidator.has_value());
         OperationContext* opCtx = operationContext();
 
-        // (Generic FCV reference): This exercises the refresh path, which only occurs at
-        // FCV 8.0, 8.3, or while upgrading from those to latest. The refresh code paths call
-        // getVersionContextOrDefault(), which requires the global FCV to be kLastContinuous or
-        // kLastLTS (or upgrading from those) when there is no forwardable op metadata — as is the
-        // case for all refresh code paths.
-        //
-        // TODO (SERVER-99655): Remove once lastLTS is 9.0 and getVersionContextOrDefault() is
-        // updated to always expect a pinned FCV in the forwardable op metadata. One approach:
-        // remove the feature flag checks in the refresh path that call
-        // getVersionContextOrDefault(), since those flags will always be enabled.
-        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
-
         auto temporaryCollMetadata =
             makeShardedMetadataForOriginalCollection(opCtx, shardThatChunkExistsOn, primaryShard);
         ScopedSetShardRole scopedSetShardRole{
@@ -514,18 +502,6 @@ public:
         ASSERT(!expectRecipientStateMachine || fieldsValidator.has_value());
         OperationContext* opCtx = operationContext();
 
-        // (Generic FCV reference): This exercises the refresh path, which only occurs at
-        // FCV 8.0, 8.3, or while upgrading from those to latest. The refresh code paths call
-        // getVersionContextOrDefault(), which requires the global FCV to be kLastContinuous or
-        // kLastLTS (or upgrading from those) when there is no forwardable op metadata — as is the
-        // case for all refresh code paths.
-        //
-        // TODO (SERVER-99655): Remove once lastLTS is 9.0 and getVersionContextOrDefault() is
-        // updated to always expect a pinned FCV in the forwardable op metadata. One approach:
-        // remove the feature flag checks in the refresh path that call
-        // getVersionContextOrDefault(), since those flags will always be enabled.
-        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
-
         auto originalCollMetadata =
             makeShardedMetadataForOriginalCollection(opCtx, shardThatChunkExistsOn, primaryShard);
 
@@ -564,6 +540,18 @@ public:
             reshardingFields.getRecipientFields()->setApproxDocumentsToCopy(_approxDocumentsToCopy);
             resharding::processReshardingFieldsForCollection(
                 opCtx, kTemporaryReshardingNss, temporaryCollMetadata, reshardingFields);
+
+            // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the shard
+            // version refresh above does not initiate cloning; the coordinator drives it directly.
+            ASSERT_FALSE(getPersistedRecipientDocument(opCtx, kReshardingUUID).getCloneTimestamp());
+            (*recipientStateMachine)
+                ->onCoordinatorStateAdvanced(
+                    CoordinatorStateEnum::kCloning,
+                    ReshardingRecipientService::RecipientStateMachine::CloneDetails{
+                        _minFetchTimestamp,
+                        _approxDocumentsToCopy,
+                        _approxBytesToCopy,
+                        reshardingFields.getRecipientFields()->getDonorShards()});
 
             bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
             while (true) {
@@ -919,130 +907,11 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardOwnsChunks_StoreOplogFetcherProgress) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    // Not set featureFlagReshardingStoreOplogFetcherProgress to verify that it defaults to true.
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
-                               /*primaryShard=*/kThisShard.getShardId(),
-                               /*performVerification=*/boost::none,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{.storeOplogFetcherProgress = true});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardOwnsChunks_NotStoreOplogFetcherProgress) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard storeOplogFetcherProgressFeatureFlagController(
-        "featureFlagReshardingStoreOplogFetcherProgress", false);
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
-                               /*primaryShard=*/kThisShard.getShardId(),
-                               /*performVerification=*/boost::none,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{.storeOplogFetcherProgress = false});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_NotPrimaryShard) {
     testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
                                /*primaryShard=*/kOtherShard.getShardId(),
                                /*performVerification=*/boost::none,
                                /*expectRecipientStateMachine=*/false);
-}
-
-TEST_F(
-    ReshardingDonorRecipientCommonTest,
-    ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningAndApplyIfApplicable) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
-        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    unittest::ServerParameterGuard skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", false);
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
-                               /*primaryShard=*/kThisShard.getShardId(),
-                               /*performVerification=*/boost::none,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{.skipCloningAndApplying = false});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningIfApplicable) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
-        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    unittest::ServerParameterGuard skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", true);
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
-                               /*primaryShard=*/kThisShard.getShardId(),
-                               /*performVerification=*/boost::none,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{.skipCloning = true});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningIfApplicable) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
-        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    unittest::ServerParameterGuard skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", false);
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
-                               /*primaryShard=*/kThisShard.getShardId(),
-                               /*performVerification=*/boost::none,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{.skipCloning = false});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard verificationFeatureFlagController(
-        "featureFlagReshardingVerification", true);
-    boost::optional<bool> performVerification = boost::none;
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
-                               /*primaryShard=*/kOtherShard.getShardId(),
-                               performVerification,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    unittest::ServerParameterGuard verificationFeatureFlagController(
-        "featureFlagReshardingVerification", false);
-    auto performVerification = boost::none;
-
-    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
-                               /*primaryShard=*/kOtherShard.getShardId(),
-                               performVerification,
-                               /*expectRecipientStateMachine=*/true,
-                               RecipientFieldsValidator{});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerification) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
-    bool performVerification = false;
-
-    testProcessRecipientFields(
-        /*shardThatChunkExistsOn=*/kThisShard.getShardId(),
-        /*primaryShard=*/kOtherShard.getShardId(),
-        performVerification,
-        /*expectRecipientStateMachine=*/true,
-        RecipientFieldsValidator{.performVerification = performVerification});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
@@ -1185,8 +1054,6 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
-
     testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
                                /*primaryShard=*/kThisShard.getShardId(),
                                /*performVerification=*/boost::none,

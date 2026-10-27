@@ -47,8 +47,6 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
     - jstests/sharding/query/change_streams/test_change_stream_sharding_move_chunk_events.js
     - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
-    - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
-    - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
   exclude_with_any_tags:
     - multiversion_incompatible
     - backport_required_multiversion

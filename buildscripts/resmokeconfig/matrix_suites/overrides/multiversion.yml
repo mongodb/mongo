@@ -557,13 +557,8 @@
   value:
     exclude_files:
       # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
-      # enabled at 9.0 last-LTS, so the v2 reader bypasses the v1 failpoint used by this test.
+      # enabled at FCV 9.0, so the v2 reader bypasses the v1 failpoint used by this test.
       - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
-      # TODO SERVER-132935: re-enable once the test handles the 9.0 last-LTS mongos
-      # rejecting duplicate stmtIds with InvalidOptions instead of the transaction-level error expected here.
-      - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
-      # TODO SERVER-132935: re-enable once the 9.0 binary can parse latestFCV 9.1.
-      - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
 
 # The new-binary half of a mixed-bin-versions node can take the replicated fast count
 # initial-sync path even when its sync source is an old binary that never used it, because the

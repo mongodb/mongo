@@ -1215,63 +1215,6 @@ TEST_F(MakeReshardingOperationContextTest, PropagationIsPreservedByFactory) {
     ASSERT_TRUE(VersionContext::getDecoration(cancelableOpCtx.get()).canPropagateAcrossShards());
 }
 
-TEST_F(MakeReshardingOperationContextTest,
-       GetVersionContextFallsBackToDefaultWhenNoVersionContext) {
-    // TODO(SERVER-99655) Remove this test when lastLTS is 9.0 and ForwardableOperationMetadata
-    // should always have a VersionContext.
-
-    // (Generic FCV reference): used for testing, should exist across LTS binary version
-    using GenericFCV = multiversion::GenericFCV;
-
-    // Save the original FCV to restore at the end.
-    auto originalFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
-
-    // Test kLastLTS -> kLastLTS
-    {
-        SCOPED_TRACE("kLastLTS");
-        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
-        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kLastLTS);
-        ForwardableOperationMetadata emptyFom;
-        auto vCtx =
-            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
-        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastLTS});
-    }
-
-    // Test kLastContinuous -> kLastContinuous
-    {
-        SCOPED_TRACE("kLastContinuous");
-        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
-        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kLastContinuous);
-        ForwardableOperationMetadata emptyFom;
-        auto vCtx =
-            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
-        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastContinuous});
-    }
-
-    // Test kUpgradingFromLastLTSToLatest -> kLastLTS
-    {
-        SCOPED_TRACE("kUpgradingFromLastLTSToLatest");
-        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
-        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kUpgradingFromLastLTSToLatest);
-        ForwardableOperationMetadata emptyFom;
-        auto vCtx =
-            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
-        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastLTS});
-    }
-
-    // Test kUpgradingFromLastContinuousToLatest -> kLastContinuous
-    {
-        SCOPED_TRACE("kUpgradingFromLastContinuousToLatest");
-        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
-        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kUpgradingFromLastContinuousToLatest);
-        ForwardableOperationMetadata emptyFom;
-        auto vCtx =
-            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
-        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastContinuous});
-    }
-}
-
 class IsFCVTheSameTest : public unittest::Test {
 protected:
     CommonReshardingMetadata makeMetadata(

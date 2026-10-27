@@ -13,7 +13,6 @@
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/version_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/version/releases.h"
@@ -564,82 +563,6 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileSplitOrMergeInProgress) {
     inLock.get_future().wait();
     blockSplitMerge.set_value();
     lockReleased.wait();
-}
-
-TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWithoutOperationFCV) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
-
-    const auto originalFCV =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
-    // (Generic FCV reference): Put the server in the authoritative metadata transition state to
-    // verify normal chunk registrations are rejected.
-    serverGlobalParams.mutableFCV.setVersion(
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerDonateChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "DonateColl"),
-                  createMoveRangeRequestFields()));
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerReceiveChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
-                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                  ShardId("shard0001"),
-                  /*waitForCompletionOfMigrationOps=*/false));
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerSplitOrMergeChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "SplitMergeColl"),
-                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
-
-    // (Generic FCV reference): Restore latest FCV to verify registration is accepted once the
-    // transition condition is gone.
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-
-    auto scopedSplitMergeChunk = assertGet(_registry.registerSplitOrMergeChunk(
-        _opCtx,
-        NamespaceString::createNamespaceString_forTest("TestDB", "StableLatestColl"),
-        ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
-}
-
-TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejectDuringTransition) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
-
-    const auto originalFCV =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
-
-    // (Generic FCV reference): Pin the operation to last LTS before transitioning the server FCV
-    // to verify stale-OFCV registrations are still rejected outside recovery.
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
-    VersionContext::FixedOperationFCVRegion fixedOperationFCV(_opCtx);
-    serverGlobalParams.mutableFCV.setVersion(
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerDonateChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "DonateColl"),
-                  createMoveRangeRequestFields()));
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerReceiveChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
-                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                  ShardId("shard0001"),
-                  /*waitForCompletionOfMigrationOps=*/false));
-
-    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              _registry.registerSplitOrMergeChunk(
-                  _opCtx,
-                  NamespaceString::createNamespaceString_forTest("TestDB", "SplitMergeColl"),
-                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
 }
 
 TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistration) {

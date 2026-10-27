@@ -540,7 +540,6 @@ struct TestOptions {
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
     bool performVerification = true;
-    bool driveCloneNoRefresh;
     boost::optional<AbortOptions> abortOptions;
 
     BSONObj toBSON() const {
@@ -552,7 +551,6 @@ struct TestOptions {
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
         bob.append("performVerification", performVerification);
-        bob.append("driveCloneNoRefresh", driveCloneNoRefresh);
         if (abortOptions) {
             bob.append("abortOptions", abortOptions->toBSON());
         }
@@ -573,22 +571,19 @@ std::vector<TestOptions> makeBasicTestOptions() {
 
     // Base case: all options false.
     // {isAlsoDonor, skipCloningAndApplying, skipCloning, skipBuildingIndexes, noChunksToCopy,
-    //  storeOplogFetcherProgress, performVerification, driveCloneNoRefresh}
-    testOptions.push_back({false, false, false, false, false, false, false, false});
+    //  storeOplogFetcherProgress, performVerification}
+    testOptions.push_back({false, false, false, false, false, false, false});
 
     // Test each option individually set to true.
 
     // isAlsoDonor = true
-    testOptions.push_back({true, false, false, false, false, false, false, false});
+    testOptions.push_back({true, false, false, false, false, false, false});
 
     // skipCloningAndApplying = true (requires noChunksToCopy = true)
-    testOptions.push_back({false, true, false, false, true, false, false, false});
+    testOptions.push_back({false, true, false, false, true, false, false});
 
     // skipCloning = true (requires noChunksToCopy = true)
-    testOptions.push_back({false, false, true, false, true, false, false, false});
-
-    // driveCloneNoRefresh = true
-    testOptions.push_back({false, false, false, false, false, false, false, true});
+    testOptions.push_back({false, false, true, false, true, false, false});
 
     return testOptions;
 }
@@ -610,36 +605,32 @@ std::vector<TestOptions> makeAllTestOptions() {
 
     // Base case: all options false.
     // {isAlsoDonor, skipCloningAndApplying, skipCloning, skipBuildingIndexes, noChunksToCopy,
-    //  storeOplogFetcherProgress, performVerification, driveCloneNoRefresh}
+    //  storeOplogFetcherProgress, performVerification}
     addWithBothPerformVerificationValues(
-        {false, false, false, false, false, false, false /*performVerification*/, false});
+        {false, false, false, false, false, false, false /*performVerification*/});
 
     // Test each option individually set to true (except performVerification which is
     // tested via combinations in the helper above).
 
     // isAlsoDonor = true
     addWithBothPerformVerificationValues(
-        {true, false, false, false, false, false, false /*performVerification*/, false});
+        {true, false, false, false, false, false, false /*performVerification*/});
 
     // skipCloningAndApplying = true (requires noChunksToCopy = true for valid combination)
     addWithBothPerformVerificationValues(
-        {false, true, false, false, true, false, false /*performVerification*/, false});
+        {false, true, false, false, true, false, false /*performVerification*/});
 
     // skipCloning = true (requires noChunksToCopy = true for valid combination)
     addWithBothPerformVerificationValues(
-        {false, false, true, false, true, false, false /*performVerification*/, false});
+        {false, false, true, false, true, false, false /*performVerification*/});
 
     // noChunksToCopy = true
     addWithBothPerformVerificationValues(
-        {false, false, false, false, true, false, false /*performVerification*/, false});
+        {false, false, false, false, true, false, false /*performVerification*/});
 
     // storeOplogFetcherProgress = true
     addWithBothPerformVerificationValues(
-        {false, false, false, false, false, true, false /*performVerification*/, false});
-
-    // driveCloneNoRefresh = true
-    addWithBothPerformVerificationValues(
-        {false, false, false, false, false, false, false /*performVerification*/, true});
+        {false, false, false, false, false, true, false /*performVerification*/});
 
     return testOptions;
 }
@@ -899,15 +890,9 @@ public:
     void notifyToStartCloning(OperationContext* opCtx,
                               RecipientStateMachine& recipient,
                               const ReshardingRecipientDocument& recipientDoc) {
-        auto driveCloneNoRefresh =
-            resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
-
-        if (driveCloneNoRefresh) {
-            auto ignore = notifyToStartCloningUsingCmd(recipient, recipientDoc);
-        } else {
-            _onReshardingFieldsChanges(
-                opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
-        }
+        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the coordinator
+        // always drives cloning directly.
+        auto ignore = notifyToStartCloningUsingCmd(recipient, recipientDoc);
     }
 
     void notifyCriticalSectionStarted(OperationContext* opCtx,
@@ -1165,18 +1150,11 @@ protected:
             return;
         }
 
-        auto expectedApproxDocsToCopy = testOptions.noChunksToCopy ? 0 : approxDocumentsToCopy;
-        auto expectedApproxBytesToCopy = testOptions.noChunksToCopy ? 0 : approxBytesToCopy;
-
-        auto driveCloneNoRefresh =
-            resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
-        if (driveCloneNoRefresh) {
-            // Unit tests rely on resharding fields to set the copy metrics. With no refresh
-            // enabled, the coordinator sends copy metrics according to the chunk manager, which
-            // ignores the arbitary noChunksToCopy value set in unit tests.
-            expectedApproxDocsToCopy = approxDocumentsToCopy;
-            expectedApproxBytesToCopy = approxBytesToCopy;
-        }
+        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the coordinator
+        // drives cloning. The coordinator sends copy metrics according to the chunk manager, which
+        // ignores the arbitrary noChunksToCopy value set in unit tests.
+        auto expectedApproxDocsToCopy = approxDocumentsToCopy;
+        auto expectedApproxBytesToCopy = approxBytesToCopy;
 
         ASSERT_EQ(*recipientDoc.getMetrics()->getApproxDocumentsToCopy(), expectedApproxDocsToCopy);
         ASSERT_EQ(*recipientDoc.getMetrics()->getApproxBytesToCopy(), expectedApproxBytesToCopy);
@@ -1470,11 +1448,9 @@ protected:
     }
 
     void setupFeatureFlags(const TestOptions& testOptions) {
+        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the flag is
+        // never overridden.
         _cloneNoRefreshController.reset();
-        if (!testOptions.driveCloneNoRefresh) {
-            _cloneNoRefreshController.emplace("featureFlagReshardingCloneNoRefresh",
-                                              /* enabled */ false);
-        }
     }
 
 private:
@@ -1509,9 +1485,7 @@ private:
         auto reshardingFields = TypeCollectionReshardingFields{recipientDoc.getReshardingUUID()};
         reshardingFields.setRecipientFields(_makeRecipientFields(recipientDoc));
         reshardingFields.setState(coordinatorState);
-        bool noChunksToCopy = recipientDoc.getSkipCloningAndApplying().value_or(false) ||
-            recipientDoc.getSkipCloning().value_or(false) || _noChunksToCopy.value_or(false);
-        recipient.onReshardingFieldsChanges(opCtx, reshardingFields, noChunksToCopy);
+        recipient.onReshardingFieldsChanges(opCtx, reshardingFields);
     }
 
     std::shared_ptr<RecipientStateTransitionController> _controller;
@@ -3451,8 +3425,7 @@ TEST_F(ReshardingRecipientServiceTest, OnReshardingFieldsChangesTassertsInAuthor
     reshardingFields.setState(CoordinatorStateEnum::kApplying);
 
     // onReshardingFieldsChanges throws when called in the authoritative path.
-    ASSERT_THROWS_WITH_CHECK(recipient.onReshardingFieldsChanges(
-                                 opCtx.get(), reshardingFields, /*noChunksToCopy=*/false),
+    ASSERT_THROWS_WITH_CHECK(recipient.onReshardingFieldsChanges(opCtx.get(), reshardingFields),
                              DBException,
                              [](const DBException& ex) {
                                  EXPECT_EQ(ex.code(), 12862901);

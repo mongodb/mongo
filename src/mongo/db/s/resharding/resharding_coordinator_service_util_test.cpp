@@ -380,25 +380,6 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
-       SkipReshardingFieldsWritesForCoordinatorHonorsPinnedLastLTSVersionContext) {
-    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
-
-    ReshardingCoordinatorDocument coordinatorDoc;
-    // (Generic FCV reference): pin the operation to last-LTS so the InitNoRefresh feature flag,
-    // which is gated on the latest FCV, evaluates to false and the legacy write path is
-    // selected -- regardless of the global flag value.
-    auto metadata = makeMetadata(
-        UUID::gen(),
-        VersionContext{ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}});
-    metadata.setStartTime(Date_t::now());
-
-    coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
-    coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
-
-    ASSERT_FALSE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
-}
-
-TEST_F(ReshardingCoordinatorServiceUtilTest,
        SkipReshardingFieldsWritesForCoordinatorHonorsGlobalFlagDisableShortCircuit) {
     unittest::ServerParameterGuard flagScope{"featureFlagReshardingInitNoRefresh", false};
 
