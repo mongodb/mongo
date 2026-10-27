@@ -190,3 +190,4 @@ configs:
         arg_vartype: Double
         validator:
             gte: 0.0
+            lte: {expr: "StorageGlobalParams::kMaxOplogMinRetentionHours"}

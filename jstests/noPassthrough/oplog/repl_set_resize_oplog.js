@@ -53,6 +53,24 @@ assert.commandFailedWithCode(
     "Expected replSetResizeOplog to fail because the minimum retention hours was too low",
 );
 
+// Min Retention Hours not valid: above the 1e10 hour cap
+assert.commandFailedWithCode(
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, minRetentionHours: 1e10 + 1}),
+    ErrorCodes.BadValue,
+    "Expected replSetResizeOplog to fail because the minimum retention hours was too high",
+);
+
+// The maximum min retention hours is accepted.
+assert.commandWorked(
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, minRetentionHours: 1e10}),
+);
+assert.commandWorked(
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, minRetentionHours: 24}),
+);
+
+// The startup option is capped as well.
+assert.throws(() => MongoRunner.runMongod({replSet: "rs", oplogMinRetentionHours: 1e10 + 1}));
+
 // The maximum: 1PB
 assert.commandWorked(
     primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB}),

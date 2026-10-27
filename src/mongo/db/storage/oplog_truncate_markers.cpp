@@ -216,7 +216,7 @@ void OplogTruncateMarkers::kill() {
 Date_t OplogTruncateMarkers::newestExpiredWallTime(OperationContext* opCtx) {
     // retention times can be fractional, so use floating point arithmetic for this calculation.
     static const double kNumMSInHour = durationCount<Milliseconds>(Hours(1));
-    long minRetentionMS = storageGlobalParams.oplogMinRetentionHours.load() * kNumMSInHour;
+    int64_t minRetentionMS = storageGlobalParams.oplogMinRetentionHours.load() * kNumMSInHour;
     // If retention by time is disabled, consumers with space-based retention will consider all
     // records expired and consumers without will consider no records expired.
     // The former case is handled separately in _hasExcessMarkers() in this file.
@@ -313,7 +313,8 @@ bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, R
     // Note that oplogMinRetentionHours can be fractional, so don't use Interval to calculate this.
     double minRetentionSeconds = storageGlobalParams.oplogMinRetentionHours.load() * 60 * 60;
     // When truncating by time, use a smaller wake time to prevent too much oplog from accumulating.
-    Seconds checkPeriod((minRetentionSeconds != 0.0) ? std::min<int>(30, minRetentionSeconds) : 30);
+    Seconds checkPeriod(
+        (minRetentionSeconds != 0.0) ? static_cast<int>(std::min(30.0, minRetentionSeconds)) : 30);
     // Wait until kill() is called or oplog can be truncated.
     std::unique_lock<std::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;

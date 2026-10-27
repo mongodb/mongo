@@ -114,6 +114,10 @@ struct StorageGlobalParams {
     //
     // If the value isn't explicitly set during configuration, a default value of 0 is used. This
     // default may be overridden depending on architecture.
+    //
+    // The value is capped so that converting it to milliseconds cannot overflow a 64-bit integer
+    // (1e10 hours is ~3.6e16 ms).
+    static constexpr double kMaxOplogMinRetentionHours = 1e10;
     Atomic<double> oplogMinRetentionHours{0.0};
     bool oplogMinRetentionInitializedUsingDefault{true};
 

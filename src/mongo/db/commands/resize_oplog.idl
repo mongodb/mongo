@@ -3,6 +3,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/storage/storage_options.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -27,4 +29,9 @@ commands:
                 description: "Minimum number of hours to preserve oplog entry."
                 type: safeDouble
                 optional: true
-                validator: {gte: 0}
+                validator:
+                    gte: 0
+                    lte:
+                        {
+                            expr: "StorageGlobalParams::kMaxOplogMinRetentionHours",
+                        }
