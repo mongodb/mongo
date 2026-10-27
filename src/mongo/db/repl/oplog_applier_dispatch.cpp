@@ -290,6 +290,53 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
 
 }  // namespace
 
+Status flushMultikeyPathInfo(OperationContext* opCtx,
+                             StorageInterface* storageInterface,
+                             std::vector<WorkerMultikeyPathInfo>& multikeyVector,
+                             Timestamp firstTimeInBatch,
+                             Timestamp lastTimeInBatch) {
+    // Merge worker-local multikey info before applying deferred catalog writes. The same index can
+    // appear more than once when different paths become multikey at different timestamps.
+    MultikeyPathTracker mergedMultikeyPathInfo;
+    mergedMultikeyPathInfo.startTrackingMultikeyPathInfo();
+    for (auto& infoVector : multikeyVector) {
+        for (auto& info : infoVector) {
+            mergedMultikeyPathInfo.addMultikeyPathInfo(std::move(info));
+        }
+    }
+    if (mergedMultikeyPathInfo.isEmpty()) {
+        return Status::OK();
+    }
+
+    const WorkerMultikeyPathInfo sorted = mergedMultikeyPathInfo.sortByTimestamp();
+    for (const MultikeyPathInfo& info : sorted) {
+        // TODO(SERVER-129361): Once featureFlagReplicateMultikeynessInTransactions is removed,
+        // remove this comment and the firstTimeInBatch fallback below; use info.earliestTimestamp
+        // directly.
+        // A null earliestTimestamp is only expected when
+        // featureFlagReplicateMultikeynessInTransactions was off when the oplog entry was emitted.
+        // That is acceptable: with the flag off we fall back to pre-9.0 behavior where any "early
+        // enough" timestamp suffices; with the flag on we require the exact timestamp. Null can
+        // only occur for prepared transactions, and when the flag is on those now emit a new
+        // setMultikeyMetadata entry, so this case cannot arise.
+        const Timestamp ts =
+            info.earliestTimestamp.isNull() ? firstTimeInBatch : info.earliestTimestamp;
+        invariant(ts >= firstTimeInBatch && ts <= lastTimeInBatch,
+                  "Deferred multikey writes must belong to the batch");
+        auto status = storageInterface->setIndexIsMultikey(opCtx,
+                                                           info.nss,
+                                                           info.collectionUUID,
+                                                           info.indexName,
+                                                           info.multikeyMetadataKeys,
+                                                           info.multikeyPaths,
+                                                           ts);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 void deriveOpsAndFillWriterVectors(
     const OplogApplier::Options& options,
     OperationContext* opCtx,

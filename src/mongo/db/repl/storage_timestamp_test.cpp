@@ -1450,10 +1450,12 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     const LogicalTime insertTime0 = _clock->tickClusterTime(1);
     const LogicalTime insertTime1 = _clock->tickClusterTime(1);
     const LogicalTime insertTime2 = _clock->tickClusterTime(1);
+    const LogicalTime insertTime3 = _clock->tickClusterTime(1);
 
     BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
     BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
     BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
+    BSONObj doc3 = BSON("_id" << 3 << "a" << 3);
     auto op0 = repl::OplogEntry(BSON(
         "ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
              << "i"
@@ -1467,12 +1469,18 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
              << "i"
              << "ns" << nss.ns_forTest() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
 
+    auto op3 = repl::OplogEntry(BSON(
+        "ts" << insertTime3.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+             << "i"
+             << "ns" << nss.ns_forTest() << "ui" << uuid << "wall" << Date_t() << "o" << doc3));
+
     // Coerce oplog application to apply op2 before op1. This does not guarantee the actual
     // order of application however, because the oplog applier applies these operations in
     // parallel across several threads. The test accepts the possibility of a false negative
     // (test passes when it should fail) in favor of occasionally finding a true positive (test
     // fails as intended).
-    std::vector<repl::OplogEntry> ops = {op0, op2, op1};
+    // The final scalar insert bounds the batch's timestamps without adding multikey paths.
+    std::vector<repl::OplogEntry> ops = {op0, op2, op1, op3};
 
     DoNothingOplogApplierObserver observer;
     auto storageInterface = repl::StorageInterface::get(_opCtx);
