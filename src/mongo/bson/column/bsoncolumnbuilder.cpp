@@ -723,10 +723,9 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
     auto& d64 = std::get<BSONColumn::Iterator::DecodingState::Decoder64>(state.decoder);
 
     // 5. Store last uncompressed value. We need to materialize it from the encoded state, this
-    // requires an allocator that we can take from a fresh BSONColum instance. This memory is
-    // temporary and _storePrevious will copy it again using the correct allocator used by this
-    // BSONColumnBuilder.
-    auto allocator = BSONColumn(nullptr, 1).release();
+    // requires an allocator. This memory is temporary and _storePrevious will copy it again using
+    // the correct allocator used by this BSONColumnBuilder.
+    boost::intrusive_ptr<BSONElementStorage> allocator(new BSONElementStorage());
     bool deltaOfDelta = usesDeltaOfDelta(type);
     regular._storePrevious([&]() {
         if (lastUncompressed.eoo()) {
@@ -823,10 +822,9 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen128BitTypes(
     auto& d128 = std::get<BSONColumn::Iterator::DecodingState::Decoder128>(state.decoder);
 
     // 5. Store last uncompressed value. We need to materialize it from the encoded state, this
-    // requires an allocator that we can take from a fresh BSONColum instance. This memory is
-    // temporary and _storePrevious will copy it again using the correct allocator used by this
-    // BSONColumnBuilder.
-    auto allocator = BSONColumn(nullptr, 1).release();
+    // requires an allocator. This memory is temporary and _storePrevious will copy it again using
+    // the correct allocator used by this BSONColumnBuilder.
+    boost::intrusive_ptr<BSONElementStorage> allocator(new BSONElementStorage());
     regular._storePrevious([&]() {
         // Zero delta is repeat of last uncompressed literal, avoid materialization (which might
         // not be possible depending on value of last uncompressed literal). If our literal was
