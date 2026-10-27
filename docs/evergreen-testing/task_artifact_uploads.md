@@ -42,9 +42,25 @@ uploads set `Content-Disposition: attachment`, so arbitrary file bytes are downl
 rendered from the shared bucket origin.
 
 `artifact_optional: "true"` skips only a missing local file. All executions of a task share one
-prefix and object names, so restarted tasks can replace their own artifacts without changing
-download paths. Rebuilt files may have different bytes. The uploader first reads the destination's
-metadata with `HeadObject`:
+prefix and object names. Ordinary patches replace their own artifacts without requiring release
+inputs, unless explicitly opted in with `is_release: true` or `artifact_release_build: true`. Tagged
+builds with `is_release: true` and non-patch builds in `mongo-release*` projects preserve existing
+artifacts. Publishing variants outside `mongodb-mongo-master` also preserve non-patch uploads when
+`push_bucket` is set, covering included module variants and inherited YAML expansions. Producers
+that lack these signals can opt in with `artifact_release_build: true`; ordinary release variants
+need no additional marker. Bazel release arguments control compilation separately. An upload creates
+an absent object with `If-None-Match: *`. If an object already exists and belongs to this task, the
+uploader succeeds, logs that rebuilt bytes were not uploaded, and attaches the existing object's
+size and content type. This policy covers binaries, provenance JSON, and execution logs together.
+Replacing a release artifact requires manual S3 deletion; restarting alone does not replace it.
+Conditional creation races succeed only after verifying the existing object's ownership. Preserved
+objects have the requested ACL reapplied before attachment; a failed ACL update fails the upload and
+leaves the attachment empty. A wrong producer, newer recorded execution, or unreadable existing
+object still fails rather than being silently accepted. Bucket policy must enforce conditional
+creation to prevent other upload code from replacing release objects.
+
+Development tasks can replace their own artifacts without changing download paths. Rebuilt files may
+have different bytes. The uploader first reads the destination's metadata with `HeadObject`:
 
 - A missing object is created using `If-None-Match: *`.
 - An existing object must have matching `task-id`, `task-name`, and `build-variant` metadata and a
@@ -61,6 +77,42 @@ ETags guard against concurrent changes to object content, not metadata-only chan
 lock across task executions or an atomic publication of all files: avoid running producer executions
 concurrently, and restart dependent tasks if they need the rebuilt artifacts.
 
+Producers can enable release recovery with `artifact_release_provenance_file`,
+`artifact_release_execution_log_file`, and `artifact_release_related_files`. All input paths are
+relative to the Evergreen workdir, just like `artifact_local_file`. Related files are a JSON array
+of optional paths, which permits spaces and repeated basenames without losing inputs:
+
+```yaml
+artifact_release_provenance_file: src/release_binary_provenance.json
+artifact_release_execution_log_file: src/release_execution_log.binpb.zst
+artifact_release_related_files: >-
+  ["src/bazel-bin/dist-debug.tgz", "src/extra data/provenance.json"]
+```
+
+Configured provenance and execution-log files must be regular files when creating a checkpoint, and
+must be present in a restored checkpoint. Duplicate logical names and repeated destination paths are
+rejected. The uploader checkpoints the archive and sidecars together before publication, and
+restores them on retry before completing ordinary uploads. This adds one stored copy and a
+checkpoint download. The checkpoint is a private object in `mciuploads`, at the archive's task-owned
+key with `.release-inputs.tar` appended. Its upload must complete before publishing any individual
+archive or sidecar. An interrupted checkpoint upload exposes no partial object or new individual
+artifacts, so a retry can create a checkpoint from its new build. If the checkpoint completed but a
+later upload failed (or its completion response was lost), the retry restores the original inputs.
+
+Checkpoint creation uses `If-None-Match: *`, including when HEAD returns 403/AccessDenied for a
+possibly absent key. If another writer already created it, the uploader must read and validate the
+winning checkpoint. Archives record that checkpoint's ETag in `release-checkpoint-etag` metadata.
+The uploader verifies this link before restoring over local inputs and before preserving an existing
+archive, including one discovered after a conditional creation race. A missing or mismatched link
+requires manual recovery, preventing a new checkpoint from relabelling an old archive. Unreadable
+existing objects fail; an ambiguous HEAD can only permit conditional creation. This requires object
+read and write permissions but no `s3:ListBucket`. A denied archive read may leave a private
+checkpoint behind, but cannot publish mismatched binaries or sidecars.
+
+Checkpoints are uncompressed tar files capped at 100 GiB. Downloads and member sizes are bounded and
+checked against available disk space. Every member is validated and staged before any local input is
+removed or replaced. Producer wiring is added with the migration.
+
 Evergreen functions cannot invoke other functions. The producer migration introduces shared
 `upload_task_artifact_exec` and `attach_task_artifact` YAML anchors to embed uploads in existing
 functions. Callers override artifact parameters while preserving the executing task identity.
@@ -71,8 +123,9 @@ identity can bypass this convention while holding the shared write credentials.
 ## Adoption and enforcement
 
 The uploader is available for use by Evergreen tasks. Existing producers and consumers retain their
-current upload and download paths until they are migrated together in the next change. YAML and
-generated-task lint enforcement is added after that migration.
+current upload and download paths until they are migrated together after uploader infrastructure and
+provenance validation are in place. YAML and generated-task lint enforcement is added after that
+migration.
 
 The uploader establishes a configuration convention, not an AWS authorization boundary. Completing
 that boundary requires Evergreen infrastructure to issue short-lived write credentials scoped to the
@@ -82,9 +135,12 @@ scoped credentials should allow `s3:PutObject`, `s3:PutObjectAcl`, `s3:AbortMult
 the `s3:GetObject` permission needed for `HeadObject` only beneath the task prefix, without
 permission to delete objects. `s3:PutObjectAcl` is required because both `PutObject` and
 `CreateMultipartUpload` set an explicit ACL, including for private uploads. `HeadObject` can return
-403 for a missing object without bucket-list permission. In that case the uploader attempts only
-`If-None-Match: *` creation, which cannot overwrite an existing object. Replacement requires a
-successful ownership and ETag check; an unreadable existing object cannot be replaced. Credentials
+403 for a missing object without bucket-list permission. Both development and release uploads then
+attempt only `If-None-Match: *` creation, which cannot overwrite an existing object. A refused
+release creation requires a successful read and ownership check before preservation; recovery also
+requires the archive to reference the winning checkpoint. Development replacement requires a
+successful ownership and ETag check. An unreadable existing object cannot be preserved or replaced.
+The uploader never lists the bucket, so these workflows do not require `s3:ListBucket`. Credentials
 for downloading other tasks' artifacts remain separate.
 
 A bucket policy can additionally require conditional writes on the `task-artifacts` namespace. It
@@ -92,6 +148,13 @@ must allow both `If-None-Match` creation and `If-Match` replacement, and permit 
 and part uploads while requiring the condition on completion. Credential issuance and bucket policy
 changes live outside this repository and are prerequisites for claiming that arbitrary task code
 cannot bypass these checks.
+
+Writer-supplied metadata also cannot authenticate release binaries or checkpoints against a writer
+who already has shared bucket credentials. Such a writer can plant matching metadata and bytes.
+Task-scoped credentials from a trusted issuer, removal of shared write credentials, and conditional
+bucket policy are required before release rollout; uploader-side checks cannot establish this
+boundary. These changes prepare CI artifact handling and do not establish a server vulnerability or
+a CVE disclosure requirement.
 
 Before enabling this on release-producing projects, validate signed artifact attachments, Windows
 uploads, large multipart artifacts, dependent downloads, and build promotion in an Evergreen patch.

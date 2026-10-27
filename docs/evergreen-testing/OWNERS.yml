@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "task_artifact_uploads.md":
+    approvers:
+      - 10gen/devprod-build

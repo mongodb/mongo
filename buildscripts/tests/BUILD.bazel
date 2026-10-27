@@ -5,11 +5,19 @@ load("@rules_python//python:defs.bzl", "py_library", "py_test")
 py_test(
     name = "test_task_artifacts",
     srcs = ["test_task_artifacts.py"],
+    data = [
+        "//etc:evergreen_yml_components/variants/ibm/test_release.yml",
+        "//evergreen:upload_task_artifact.sh",
+    ],
     deps = [
         "//buildscripts:task_artifacts",
         dependency(
             "botocore",
             group = "aws",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
         ),
     ],
 )
