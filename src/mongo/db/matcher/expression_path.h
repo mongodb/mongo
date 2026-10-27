@@ -152,6 +152,11 @@ public:
                 // Handle its subpaths here.
                 if (currFieldPathRef.numParts() >= 2 && currFieldPathRef.getPart(0).empty()) {
                     rewrittenPathRef.parse(dst);
+                    if (dst.empty()) {
+                        // FieldRef::parse("") produces a zero-component FieldRef. Preserve the
+                        // empty component explicitly.
+                        rewrittenPathRef.appendPart("");
+                    }
                     for (size_t it = 1; it < currFieldPathRef.numParts(); it++) {
                         rewrittenPathRef.appendPart(currFieldPathRef.getPart(it));
                     }
@@ -163,6 +168,11 @@ public:
                 // Perform a partial prefix rewrite. 'src' is a prefix for the current field path
                 // and we should substitute it with 'dst'.
                 rewrittenPathRef.parse(dst);
+                if (dst.empty()) {
+                    // FieldRef::parse("") produces a zero-component FieldRef. Preserve the
+                    // empty component explicitly.
+                    rewrittenPathRef.appendPart("");
+                }
                 for (size_t it = prefixToRename.numParts(); it < currFieldPathRef.numParts();
                      it++) {
                     rewrittenPathRef.appendPart(currFieldPathRef.getPart(it));

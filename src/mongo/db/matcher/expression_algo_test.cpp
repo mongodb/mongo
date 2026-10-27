@@ -1180,6 +1180,62 @@ TEST(SplitMatchExpression, ShouldMovePredicateWithNestedEmptyComponentAcrossRena
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(SplitMatchExpression, ShouldMovePredicateAcrossRenamesWithEmptySrcComponent) {
+    const auto dstAndExpectations = {
+        std::make_tuple(""s, ".a"s, ".a"s),
+        std::make_tuple(""s, "..a"s, "..a"s),
+        std::make_tuple("x"s, ".a"s, "x.a"s),
+        std::make_tuple("x"s, "..a"s, "x..a"s),
+    };
+    for (const auto& [dst, predPath, expectedPath] : dstAndExpectations) {
+        SCOPED_TRACE(fmt::format(
+            "rename: \"\" -> \"{}\", path: '{}', expected: '{}'", dst, predPath, expectedPath));
+        BSONObj matchPredicate = fromjson("{'" + predPath + "': 2}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"", dst}};
+        std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_TRUE(splitExpr.first.get());
+        ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                          fromjson("{'" + expectedPath + "': {$eq: 2}}"));
+
+        ASSERT_FALSE(splitExpr.second.get());
+    }
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateAcrossRenameWithEmptyDst) {
+    const auto srcAndExpectations = {
+        std::make_tuple("a"s, "a"s, ""s),
+        std::make_tuple("a"s, "a.b"s, ".b"s),
+        std::make_tuple("a"s, "a.b.c"s, ".b.c"s),
+        std::make_tuple(""s, ""s, ""s),
+        std::make_tuple(""s, ".a"s, ".a"s),
+        std::make_tuple(""s, ".a.b"s, ".a.b"s),
+    };
+    for (const auto& [src, predPath, expectedPath] : srcAndExpectations) {
+        SCOPED_TRACE(fmt::format(
+            "rename: \"{}\" -> \"\", path: '{}', expected: '{}'", src, predPath, expectedPath));
+        BSONObj matchPredicate = fromjson("{'" + predPath + "': 2}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{src, ""}};
+        std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_TRUE(splitExpr.first.get());
+        ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                          fromjson("{'" + expectedPath + "': {$eq: 2}}"));
+
+        ASSERT_FALSE(splitExpr.second.get());
+    }
+}
+
 TEST(SplitMatchExpression, ShouldMovePredicateOnExactEmptyPathAcrossRename) {
     BSONObj matchPredicate = fromjson("{'': 1}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
