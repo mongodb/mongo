@@ -220,7 +220,6 @@ describe("relative traffic recording directory with --fork", function () {
             dbpath: pathRelativeToStartupCwd(dbDir),
             logpath: pathRelativeToStartupCwd(logFile),
             pidfilepath: `${trafficRoot}/mongod.pid`,
-            unixSocketPrefix: trafficRoot,
             setParameter: {trafficRecordingDirectory: pathRelativeToDaemonCwd(trafficDir)},
         }));
     });

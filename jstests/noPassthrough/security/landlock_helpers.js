@@ -38,7 +38,7 @@ export function pathRelativeToDaemonCwd(absPath) {
  * @returns {string} the path to the scratch directory
  */
 export function getLandlockRootRelativeScratchDirectory(suffix) {
-    return `/var/tmp/${jsTestName()}-${suffix}-${new Date().getTime()}`;
+    return `/var/tmp/${jsTestName().slice(0, 20)}-${suffix}-${UUID().hex().slice(0, 16)}`;
 }
 
 /**
