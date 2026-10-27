@@ -2,7 +2,7 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
-load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
+load("//bazel/config:py_action_env.bzl", "py_exec_import_paths", "py_runtime_pythonpath")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python:py_info.bzl", "PyInfo")
@@ -254,7 +254,7 @@ def _resmoke_config_impl(ctx):
             inputs = deps,
             outputs = [generated_config_file],
             arguments = args,
-            env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
+            env = {"PYTHONPATH": py_runtime_pythonpath(python, python_path)},
         )
 
     return [DefaultInfo(files = depset([generated_config_file]))]

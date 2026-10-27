@@ -343,6 +343,7 @@ py_test(
     srcs = ["test_gather_failed_tests.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:create_bazel_test_report",
         "//buildscripts:gather_failed_tests",
     ],
 )
