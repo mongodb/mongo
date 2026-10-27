@@ -799,6 +799,27 @@ Status attemptUserCreateTimeseriesNS(OperationContext* opCtx,
     return status;
 }
 
+TEST_F(DatabaseTest, UserCreateNSRejectsBucketsWithoutTimeseriesOptionsWhenViewlessEnabled) {
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.implicit");
+    auto opCtx = _opCtx.get();
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
+    invariant(db);
+    WriteUnitOfWork wuow(opCtx);
+    const auto status = db->userCreateNS(opCtx,
+                                         nss,
+                                         CollectionOptions{},
+                                         /*createDefaultIndexes=*/false,
+                                         /*idIndex=*/BSONObj(),
+                                         /*fromMigrate=*/false);
+    ASSERT_EQ(status.code(), ErrorCodes::IllegalOperation);
+    ASSERT_STRING_CONTAINS(status.reason(), "without timeseries options");
+}
+
 TEST_F(DatabaseTest, UserCreateNSRejectsLegacyBucketsWhenViewlessTimeseriesEnabled) {
     unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
     const auto bucketsNss =

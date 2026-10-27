@@ -962,6 +962,13 @@ Status DatabaseImpl::userCreateNS(
         return swCollator.getStatus();
     }
 
+    if (nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&
+        !MONGO_unlikely(skipCreateTimeseriesBucketsWithoutOptionsCheck.shouldFail())) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Creation of a timeseries bucket collection without timeseries "
+                      "options is not allowed");
+    }
+
     if (!MONGO_unlikely(skipCreateTimeseriesVersionMismatchCheck.shouldFail()) &&
         opCtx->isEnforcingConstraints()) {
         const auto viewlessTimeseriesEnabled =
@@ -997,13 +1004,6 @@ Status DatabaseImpl::userCreateNS(
                                       nss.toStringForErrorMsg()));
             }
         }
-    }
-
-    if (nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&
-        !MONGO_unlikely(skipCreateTimeseriesBucketsWithoutOptionsCheck.shouldFail())) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "Creation of a timeseries bucket collection without timeseries "
-                      "options is not allowed");
     }
 
     tassert(10619100,
