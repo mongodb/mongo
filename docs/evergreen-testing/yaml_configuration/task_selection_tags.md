@@ -87,6 +87,8 @@ task could be tagged with any number of the following tags:
 - `incompatible_system_allocator` - the task should be excluded from variants that use the system
   allocator.
 - `incompatible_all_feature_flags` - the task should be excluded from all-feature-flags variants.
+- `incompatible_with_pipelined_oplog_applier` - the task should be excluded from variants that
+  enable the Pipelined Oplog Applier, e.g. the disagg POA experimental variant.
 - `incompatible_development_variant` - the task should be excluded from the development variants.
 - `incompatible_oscrypto` - the task should be excluded from variants unsupported by oscrypto.
 - `incompatible_with_bazel_remote_test` - the task's Bazel suite cannot run on remote executors, so

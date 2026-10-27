@@ -144,6 +144,7 @@ rules:
           - incompatible_disaggregated_storage
           - incompatible_disaggregated_storage_tsan
           - incompatible_disaggregated_storage_no_feature_flag
+          - incompatible_with_pipelined_oplog_applier
           - requires_compile_variant
           - requires_large_host
           - requires_large_host_aubsan
