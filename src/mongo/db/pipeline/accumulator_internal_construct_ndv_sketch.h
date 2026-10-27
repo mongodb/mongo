@@ -16,7 +16,7 @@ namespace mongo {
  * Builds HyperLogLog sketches over field values during analyze({mode: "ndv"}), from which the
  * number of distinct values (NDV) is estimated. Constant memory. Internal-only; no merging.
  *
- * Mirrors the $_internalConstructStats syntax:
+ * Syntax:
  *     {$_internalConstructNdvSketch: {val: "$$ROOT", fields: ["a"]}}
  * 'val' evaluates to the (typically $project-narrowed) document; the accumulator extracts each
  * path in 'fields' itself, so absent fields stay distinguishable from null ones. Over the

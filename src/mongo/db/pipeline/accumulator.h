@@ -11,8 +11,6 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
-#include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
@@ -240,35 +238,6 @@ public:
 private:
     bool _haveFirst;
     Value _first;
-};
-
-class AccumulatorInternalConstructStats final : public AccumulatorState {
-public:
-    static constexpr auto kName = "$_internalConstructStats"sv;
-
-    const char* getOpName() const final {
-        return kName.data();
-    }
-
-    explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx,
-                                               InternalConstructStatsAccumulatorParams);
-
-    Document serialize(boost::intrusive_ptr<Expression> initializer,
-                       boost::intrusive_ptr<Expression> argument,
-                       const query_shape::SerializationOptions& options) const final;
-
-    void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) final;
-    void reset() final;
-
-    bool isCommutative() const final {
-        return true;
-    }
-
-private:
-    double _count;  // Can't this be an int?
-    InternalConstructStatsAccumulatorParams _params;
-    std::vector<stats::SBEValue> _values;
 };
 
 class AccumulatorLast final : public AccumulatorState {

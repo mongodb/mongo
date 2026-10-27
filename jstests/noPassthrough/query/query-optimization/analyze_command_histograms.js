@@ -3,6 +3,7 @@
  *   requires_profiling,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -109,6 +110,25 @@ setup();
     testAnalayzeValidKey(["a", "b"], [{a: {b: 1}}]);
     // Multiple documents, values missing.
     testAnalayzeValidKey(["a"], [{a: 1}, {b: 1}, {a: 2}]);
+})();
+
+setup();
+
+(function validateKeyDepthOnEmptyCollection() {
+    assert.commandWorked(coll.deleteMany({}));
+    const maxDepth = assert.commandWorked(
+        db.adminCommand({getParameter: 1, maxBSONDepth: 1}),
+    ).maxBSONDepth;
+    assert.commandFailedWithCode(
+        db.runCommand({
+            analyze: coll.getName(),
+            mode: "histograms",
+            key: Array(maxDepth + 1)
+                .fill("a")
+                .join("."),
+        }),
+        ErrorCodes.Overflow,
+    );
 })();
 
 setup();
@@ -332,5 +352,51 @@ assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 })();
 
 cleanup();
+
+// Field paths follow aggregation semantics, and missing is distinct from null.
+(function validatePersistedValues() {
+    assert.commandWorked(
+        coll.insertMany([{a: {b: 1}}, {a: [{b: 2}, {b: 3}, {}]}, {a: {b: null}}, {}]),
+    );
+    const analyze = () => {
+        assert.commandWorked(
+            db.runCommand({analyze: coll.getName(), mode: "histograms", key: "a.b"}),
+        );
+        return syscoll.findOne({_id: "a.b"}).statistics;
+    };
+    const stats = analyze();
+    assert.eq(4, stats.documents);
+    assert.eq(1.0, stats.sampleRate);
+    const count = (type) =>
+        Number(stats.typeCount.find((entry) => entry.typeName === type)?.count ?? 0);
+    assert.eq([1, 1, 1], [count("Nothing"), count("Null"), count("Array")]);
+    assert.eq([1], stats.scalarHistogram.bounds);
+    assert.eq([2, 3], stats.arrayStatistics.uniqueHistogram.bounds);
+
+    // An empty collection leaves existing statistics alone.
+    assert.commandWorked(coll.deleteMany({}));
+    assert.eq(stats, analyze());
+    cleanup();
+})();
+
+(function validateWriteFailureIsReported() {
+    assert.commandWorked(coll.insert({a: 1}));
+    const failPoint = configureFailPoint(
+        conn,
+        "failCommand",
+        {
+            failCommands: ["update"],
+            failInternalCommands: true,
+            errorCode: ErrorCodes.OperationFailed,
+        },
+        {times: 1},
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: coll.getName(), mode: "histograms", key: "a"}),
+        ErrorCodes.OperationFailed,
+    );
+    failPoint.off();
+    cleanup();
+})();
 
 MongoRunner.stopMongod(conn);

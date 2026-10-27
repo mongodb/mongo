@@ -1,8 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/commands/query_cmd/analyze_cmd.h"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -17,17 +15,26 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/ce/ndv/field_stats.h"
 #include "mongo/db/query/compiler/ce/ndv/ndv_sketch_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/on_the_fly_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
+#include "mongo/db/query/compiler/stats/ce_histogram.h"
+#include "mongo/db/query/compiler/stats/max_diff.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
@@ -43,6 +50,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
@@ -182,66 +190,6 @@ std::vector<std::string> normalizeNdvKeyPaths(
         }
     }
     return paths;
-}
-
-StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
-                                                       std::string_view collection,
-                                                       std::string_view keyPath,
-                                                       boost::optional<double> sampleRate,
-                                                       boost::optional<int> numBuckets) {
-    // Build a pipeline that accomplishes the analyze request. The building code constructs a
-    // pipeline that looks like this, assuming the analyze is on the key "a.b.c"
-    //
-    //      [
-    //          { $match: { $expr: {$lt: [{$rand: {}, sampleRate]} } }, // If sampleRate is
-    //          specified, otherwise this stage is omitted
-    //          { $project: { val : "$a.b.c" } },
-    //          { $group: {
-    //              _id: "a.b.c",
-    //              statistics: { $_internalConstructStats: {
-    //                              val: "$$ROOT",
-    //                              sampleRate: sampleRate,
-    //                              numberBuckets: numberBuckets }
-    //              }
-    //          },
-    //          { $merge: {
-    //              into: "system.statistics." + collection,
-    //              on: "key",
-    //              whenMatched: "replace",
-    //              whenNotMatched: "insert" }
-    //          }
-    //      ]
-    //
-    std::string into(str::stream() << NamespaceString::kStatisticsCollectionPrefix << collection);
-    FieldPath fieldPath(keyPath);
-
-    BSONArrayBuilder pipelineBuilder;
-
-    if (sampleRate) {
-        pipelineBuilder << BSON(
-            "$match" << BSON(
-                "$expr" << BSON("$lt" << BSON_ARRAY(BSON("$rand" << BSONObj()) << *sampleRate))));
-    }
-
-    InternalConstructStatsAccumulatorParams statsAccumParams;
-    statsAccumParams.setVal("$$ROOT");
-    statsAccumParams.setSampleRate(sampleRate ? *sampleRate : 1.0);
-    statsAccumParams.setNumberBuckets(numBuckets ? *numBuckets
-                                                 : mongo::stats::ScalarHistogram::kMaxBuckets);
-
-    pipelineBuilder << BSON("$project" << BSON("val" << fieldPath.fullPathWithPrefix()))
-                    << BSON("$group" << BSON("_id" << keyPath << "statistics"
-                                                   << BSON("$_internalConstructStats"
-                                                           << statsAccumParams.toBSON())))
-                    << BSON("$merge" << BSON("into" << std::move(into) << "on"
-                                                    << "_id"
-                                                    << "whenMatched"
-                                                    << "replace"
-                                                    << "whenNotMatched"
-                                                    << "insert"));
-
-    return BSON("aggregate" << collection << "pipeline" << pipelineBuilder.arr() << "cursor"
-                            << BSONObj() << "allowDiskUse" << false);
 }
 
 /**
@@ -491,6 +439,86 @@ void runSampleMode(OperationContext* opCtx,
     analyzeMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));
 }
 
+/**
+ * Validates the collection and scans it under one acquisition, returning the value of 'key' for
+ * every sampled document. Sets 'sampleRate' to the proportion actually requested.
+ */
+std::vector<stats::SBEValue> collectHistogramValues(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    std::string_view key,
+                                                    boost::optional<double>& sampleRate,
+                                                    boost::optional<int> sampleSize) {
+    std::vector<stats::SBEValue> values;
+    auto coll = acquireAndValidateCollection(opCtx, nss, 6799700);
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
+    const auto& collectionPtr = coll.getCollectionPtr();
+
+    // Namespace cannot be capped collection
+    uassert(6799701,
+            str::stream() << "Analyze command is not supported on capped collections",
+            !collectionPtr->isCapped());
+
+    // Namespace is normal or clustered collection
+    uassert(6799702,
+            str::stream() << nss.toStringForErrorMsg()
+                          << " is not a normal or clustered collection",
+            nss.isNormalCollection() || collectionPtr->isClustered());
+
+    validateKeyPath(key);
+    const auto numRecords = static_cast<size_t>(collectionPtr->numRecords(opCtx));
+    size_t draws = numRecords;
+    if (sampleSize) {
+        draws = std::min(static_cast<size_t>(*sampleSize), numRecords);
+        sampleRate = numRecords == 0 ? 1.0 : static_cast<double>(draws) / numRecords;
+    } else if (sampleRate) {
+        draws = std::min(numRecords, static_cast<size_t>(std::ceil(*sampleRate * numRecords)));
+    }
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(nss).build();
+    auto path = ExpressionFieldPath::createPathFromString(
+        expCtx.get(), std::string{key}, expCtx->variablesParseState);
+    if (draws == 0) {
+        return values;
+    }
+    ce::SampleSpec spec{
+        .nss = nss,
+        .requestedSampleSize = draws,
+        .topLevelSampleFieldNames = {std::string{FieldRef(key).getPart(0)}},
+    };
+    // The scan does not filter orphans, so drop them here. The shard key must survive the
+    // projection for that. Orphans still count toward 'draws', so a sampled run can come up short.
+    boost::optional<ShardFiltererImpl> shardFilterer;
+    if (coll.getShardingDescription().isSharded()) {
+        shardFilterer.emplace(*coll.getShardingFilter());
+        for (const auto& field : coll.getShardingDescription().getKeyPatternFields()) {
+            spec.topLevelSampleFieldNames.emplace(field->getPart(0));
+        }
+    }
+    MultipleCollectionAccessor collections(std::move(coll));
+    // Histogram sampling must not inherit the test-only overrides for sampling CE.
+    ce::OnTheFlySampleLoader loader(opCtx,
+                                    collections,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                    expCtx,
+                                    draws == numRecords ? ce::SamplingTechniqueEnum::kFullCollScan
+                                                        : ce::SamplingTechniqueEnum::kRandom);
+    const auto sample = uassertStatusOK(loader.tryLoad(spec));
+    for (const auto& doc : sample.docs()) {
+        if (shardFilterer &&
+            shardFilterer->documentBelongsToMe(doc) !=
+                ShardFilterer::DocumentBelongsResult::kBelongs) {
+            continue;
+        }
+        auto value = path->evaluate(Document(doc), &expCtx->variables, {});
+        values.emplace_back(sbe::value::makeValue(value));
+    }
+    return values;
+}
+
 void runHistogramsMode(OperationContext* opCtx,
                        const NamespaceString& nss,
                        boost::optional<std::string_view> key,
@@ -506,40 +534,7 @@ void runHistogramsMode(OperationContext* opCtx,
             "Only one of sampleRate and sampleSize may be present",
             !sampleRate || !sampleSize);
 
-    // Validate collection
-    {
-        const auto coll = acquireAndValidateCollection(opCtx, nss, 6799700);
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::ReadLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                          .getDatabaseProfileLevel(nss.dbName()));
-        const auto& collectionPtr = coll.getCollectionPtr();
-
-        // Namespace cannot be capped collection
-        uassert(6799701,
-                str::stream() << "Analyze command is not supported on capped collections",
-                !collectionPtr->isCapped());
-
-        // Namespace is normal or clustered collection
-        uassert(6799702,
-                str::stream() << nss.toStringForErrorMsg()
-                              << " is not a normal or clustered collection",
-                nss.isNormalCollection() || collectionPtr->isClustered());
-
-        if (sampleSize) {
-            const auto numRecords = collectionPtr->numRecords(opCtx);
-            if (numRecords == 0 || *sampleSize > numRecords) {
-                sampleRate = 1.0;
-            } else {
-                sampleRate = double(*sampleSize) / numRecords;
-            }
-        }
-    }
-
-    // Validate key
-    validateKeyPath(*key);
+    auto values = collectHistogramValues(opCtx, nss, *key, sampleRate, sampleSize);
 
     // We need to perform this operation with internal permissions.
     const bool wasInternalClient = isInternalClient(opCtx->getClient());
@@ -547,22 +542,24 @@ void runHistogramsMode(OperationContext* opCtx,
         opCtx->getClient()->setIsInternalClient(true);
     }
 
-    DBDirectClient client(opCtx);
+    ScopeGuard resetInternalClient([&] {
+        if (!wasInternalClient) {
+            opCtx->getClient()->setIsInternalClient(false);
+        }
+    });
 
-    // Run Aggregate
-    BSONObj analyzeResult;
-    client.runCommand(nss.dbName(),
-                      analyzeCommandAsAggregationCommand(
-                          opCtx, nss.coll(), std::string{*key}, sampleRate, numberBuckets)
-                          .getValue(),
-                      analyzeResult);
-
-    // We must reset the internal flag.
-    if (!wasInternalClient) {
-        opCtx->getClient()->setIsInternalClient(false);
+    if (!values.empty()) {
+        auto histogram = stats::createCEHistogram(
+            values, numberBuckets.value_or(stats::ScalarHistogram::kMaxBuckets));
+        const auto document = stats::makeStatsPath(
+            *key, values.size(), sampleRate.value_or(1.0), std::move(histogram));
+        const auto statsNss = NamespaceStringUtil::deserialize(
+            nss.dbName(),
+            std::string{NamespaceString::kStatisticsCollectionPrefix} + std::string{nss.coll()});
+        DBDirectClient client(opCtx);
+        uassertStatusOK(getStatusFromWriteCommandReply(
+            client.updateAcknowledged(statsNss, BSON("_id" << *key), document, /*upsert=*/true)));
     }
-
-    uassertStatusOK(getStatusFromCommandResult(analyzeResult));
 
     // Invalidate statistics in the cache for the analyzed path
     stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);

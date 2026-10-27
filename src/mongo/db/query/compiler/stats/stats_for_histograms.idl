@@ -81,14 +81,3 @@ structs:
                 type: string
             statistics:
                 type: Statistics
-
-    InternalConstructStatsAccumulatorParams:
-        description: "Schema for the $_internalConstructStats accumulator"
-        fields:
-            val:
-                type: string
-            sampleRate:
-                type: double
-                default: 1.0
-            numberBuckets:
-                type: int

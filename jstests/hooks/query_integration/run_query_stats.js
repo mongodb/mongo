@@ -33,17 +33,10 @@ function verifyQueryStats(nodeConn, queryStatsSpec) {
             assert(operation.hasOwnProperty("asOf"), "Missing 'asOf' in $queryStats result");
         }
     } catch (e) {
-        // The analyze command cannot be re-parsed (see SERVER-85374). Since this is a test only
-        // command, it is low priority to fix this issue, and therefore we ignore the reparse errors
-        // in this hook. The analyze command desugars into an aggregation pipeline that includes the
-        // "system.statistics" collection and the '$_internalConstructStats' accumulator. Since the
-        // aggregation pipeline can be slightly different based on user inputs, we do a best guess
-        // here that we are running analyze.
+        // NDV analyze pipelines still contain an internal-only accumulator (SERVER-85374).
         const analyzeCmdReparseErr =
             e.message.indexOf("Failed to re-parse query") !== -1 &&
-            ((e.message.indexOf("$_internalConstructStats") !== -1 &&
-                e.message.indexOf("system.statistics") !== -1) ||
-                e.message.indexOf("$_internalConstructNdvSketch") !== -1);
+            e.message.indexOf("$_internalConstructNdvSketch") !== -1;
         if (
             analyzeCmdReparseErr ||
             (allowFeatureNotSupported && kQueryStatsStoreSize0ErrCode == e.code)

@@ -28,10 +28,8 @@ const sampleBounds = sampleStats.statistics.scalarHistogram.bounds;
 // Use histogram bounds as a proxy to verify that sampling occured
 assert.neq(fullBounds, sampleBounds);
 assert.eq(0.01, sampleStats.statistics.sampleRate);
-// Verify that roughly 100 documents have been sampled. Because this is not deterministic, we give
-// a sufficiently large range to avoid flakiness in the test, but still give us confidence that we
-// are not analyzing the entire collection.
-assert.betweenIn(50, sampleStats.statistics.documents, 150);
+// Sampling draws a fixed number of documents (with replacement).
+assert.eq(100, sampleStats.statistics.documents);
 
 // Test sampleSize
 assert.commandWorked(
@@ -39,12 +37,21 @@ assert.commandWorked(
 );
 const sampleSizeStats = statscoll.find({_id: "x"}).toArray()[0];
 assert.eq(0.1, sampleSizeStats.statistics.sampleRate);
+assert.eq(1000, sampleSizeStats.statistics.documents);
 
 assert.commandWorked(
     db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleSize: 100000000}),
 );
 const sampleSizeFullStats = statscoll.find({_id: "x"}).toArray()[0];
 assert.eq(1.0, sampleSizeFullStats.statistics.sampleRate);
+
+// Rates round up so a small collection still gets a draw.
+assert.commandWorked(coll.deleteMany({}));
+assert.commandWorked(coll.insertMany([{_id: 0}, {_id: 1}, {_id: 2}]));
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleRate: 0.01}),
+);
+assert.eq(1, statscoll.findOne({_id: "x"}).statistics.documents);
 
 // Test sampling on empty collection
 assert.commandWorked(coll.deleteMany({}));

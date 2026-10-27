@@ -65,9 +65,9 @@ protected:
         make_intrusive<ExpressionContextForTest>(_opCtx.get());
 };
 
-TEST_F(InternalConstructNdvSketchTest, ParsesHistogramStyleSyntax) {
-    // Same shape as $_internalConstructStats: 'val' evaluates to the document, 'fields' names the
-    // paths the accumulator extracts itself, so absent fields arrive as missing.
+TEST_F(InternalConstructNdvSketchTest, ParsesSyntax) {
+    // 'val' evaluates to the document; 'fields' names the paths the accumulator extracts itself,
+    // so absent fields arrive as missing.
     const BSONObj spec =
         BSON("sketch" << BSON("$_internalConstructNdvSketch"
                               << BSON("val" << "$$ROOT" << "fields" << BSON_ARRAY("a"))));

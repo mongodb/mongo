@@ -58,9 +58,6 @@ filters:
   - "accumulator_internal_construct_ndv_sketch*":
     approvers:
       - 10gen/query-optimization
-  - "accumulator_internal_construct_stats.cpp":
-    approvers:
-      - 10gen/query-optimization
   - "aggregation_hint_translation.h":
     approvers:
       - 10gen/query-timeseries
