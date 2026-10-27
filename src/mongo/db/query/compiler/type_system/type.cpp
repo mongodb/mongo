@@ -424,6 +424,10 @@ Type Type::missing() {
     return Type(BSONType::eoo, Extent::kAll);
 }
 
+Type Type::null() {
+    return Type(BSONType::null, Extent::kAll);
+}
+
 Type Type::anyObject() {
     return Type(BSONType::object, Extent::kAll);
 }

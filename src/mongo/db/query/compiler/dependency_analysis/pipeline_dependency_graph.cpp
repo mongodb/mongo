@@ -35,6 +35,8 @@ namespace mongo::pipeline::dependency_graph {
 
 namespace ts = type_system;
 namespace {
+using Type = ts::Type;
+
 /**
  * Strongly typed alias for int to avoid mixing IDs of different types.
  */
@@ -462,6 +464,10 @@ void updateMetadataForConstant(FieldMetadata& metadata, const Value& value) {
     metadata.knownToBeMissing = false;
 }
 
+void updateMetadataForType(FieldMetadata& metadata, const Type& type) {
+    metadata.canFieldBeArray &= type.hasType(BSONType::array);
+}
+
 /// Returns an iterator consisting of the individual path components that make up 'path'.
 auto splitPath(PathRef path) {
     return absl::StrSplit(path, absl::ByChar('.'));
@@ -627,10 +633,20 @@ private:
 };
 }  // namespace
 
+namespace {
+Type resolvePathType(Type type, PathRef path) {
+    for (auto field : splitPath(path)) {
+        if (type.isNever()) {
+            break;
+        }
+        type = ts::resolveFieldAccess(std::move(type), field);
+    }
+    return type;
+}
+}  // namespace
+
 class DependencyGraph::Impl {
 public:
-    using Type = ts::Type;
-
     explicit Impl(const DocumentSourceContainer& container,
                   DocumentSourceContainer::const_iterator endIt,
                   CanPathBeArray canPathBeArray = defaultCanPathBeArray)
@@ -1078,11 +1094,26 @@ private:
             return !result.isNever();
         });
 
-        for (auto field : splitPath(pathMatch.path)) {
-            if (result.isNever()) {
-                break;
-            }
-            result = ts::resolveFieldAccess(std::move(result), field);
+        result = resolvePathType(std::move(result), pathMatch.path);
+        // If the matched path is a rename, we can narrow its type further based on the type of the
+        // rename source.
+        if (auto it = _types.find(pathMatch.field.fieldId); it != _types.end()) {
+            result = intersectType(std::move(result), resolveSuffixType(it->second, pathMatch));
+        }
+        return result;
+    }
+
+    /// Returns the type of the matched path, given the type of the matched field.
+    Type resolveSuffixType(const Type& fieldType, const PathMatch& match) const {
+        Type result = resolvePathType(fieldType, match.suffix());
+        // Even if we know that the matched field itself (or any field along the suffix) is not an
+        // array, we must consider the possibility that some field along the prefix might be an
+        // array. Consider for example:
+        // `[{$match: {x: {$not: {$type: 'array'}}}}, {$project: {'a.b': '$x'}}]`
+        // If 'a' is an array in the above rename, everything beneath it might become an array too
+        // when traversed.
+        if (canPrefixContainArrays(match.prefix)) {
+            result = unionType(std::move(result), Type::someArray());
         }
         return result;
     }
@@ -1617,6 +1648,15 @@ private:
         _constants[fieldId] = std::move(value);
     }
 
+    /// Records `type` as the known type for `fieldId`.
+    void setType(FieldId fieldId, Type type) {
+        if (type == Type::any()) {
+            return;
+        }
+        updateMetadataForType(_fields[fieldId].metadata, type);
+        _types.emplace(fieldId, std::move(type));
+    }
+
     /// Returns the field's known constant Value, or boost::none if none is tracked.
     /// 'knownToBeMissing' is separate — check the field's metadata for that.
     boost::optional<Value> getConstantForField(FieldId fieldId) const {
@@ -1923,8 +1963,9 @@ private:
                     }
 
                     // If the old path could have been an array before the rename, the new field can
-                    // also be an array.
-                    metadata.canFieldBeArray = canPathBeArray(oldPathMatch);
+                    // also be an array. Arrayness based on type information is determined later in
+                    // `setType()`.
+                    metadata.canFieldBeArray = canPathBeArrayFromFieldMetadata(oldPathMatch);
 
                     // Each rename modifies the new field and depends on the previous field. When
                     // the rename traverses the new path's prefix as an array (e.g. a dotted
@@ -1949,6 +1990,14 @@ private:
                     }
                     if (constant) {
                         setConstant(leafFieldId, *std::move(constant));
+                    }
+                    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled() &&
+                        // Group stages pretend that '_id' renames a prior field, but in reality,
+                        // it's not a simple rename. For instance, missing becomes null, and int(1)
+                        // and long(1) share the same bucket. Hence we don't want type information
+                        // to flow through group stages.
+                        ds.isSingleDocumentTransformation()) {
+                        setType(leafFieldId, getType(oldPathMatch));
                     }
                 },
             },
@@ -2249,12 +2298,14 @@ private:
         // Invalidate all nodes originating from the given stage.
         auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
 
-        // Clean up constants and aliases for invalidated fields.
+        // Clean up constants, aliases and types for invalidated fields.
         absl::erase_if(_collectionAliases,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
         absl::erase_if(_renames,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
         absl::erase_if(_constants,
+                       [invalidField](const auto& entry) { return entry.first >= invalidField; });
+        absl::erase_if(_types,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
         // Clean up for invalidated stages.
@@ -2336,6 +2387,9 @@ private:
 
     // Side table of known constant Values, keyed by FieldId.
     absl::flat_hash_map<FieldId, Value> _constants;
+
+    // Side table of types inferred from $match predicates.
+    absl::flat_hash_map<FieldId, Type> _types;
 
     // Owns the immediate subpipeline metadata for stages in this pipeline.
     std::vector<std::unique_ptr<SubpipelineInfo>> _subpipelineGraphs;

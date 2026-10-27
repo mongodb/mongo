@@ -162,6 +162,9 @@ public:
     /// A type covering BSONType::eoo (missing).
     static Type missing();
 
+    /// A type covering BSONType::null.
+    static Type null();
+
     /// A type covering BSONType::object.
     static Type anyObject();
 

@@ -4299,5 +4299,64 @@ TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotSkipMatchesOnOtherBaseDocument
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeFlowsThroughRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {$and: [{x: {$type: 'number'}}, {x: {$not: {$type: 'array'}}}]}},
+        {$set: {a: '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages[1].get(), "a").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "number");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFlowsThroughTransitiveRenameAndMatch) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$type: 'number'}}},
+        {$set: {a: '$x'}},
+        {$match: {a: {$not: {$type: 'array'}}}},
+        {$set: {b: '$a'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "number");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "b").toDebugString(), "number");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathFlowsThroughRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}, 'x.y': {$not: {$type: 'array'}}}},
+        {$set: {a: '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.y").toDebugString(), "~array");
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderPossiblyArrayPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {$and: [{x: {$type: 'number'}}, {x: {$not: {$type: 'array'}}}]}},
+        {$project: {'p.a': '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "number|array(S)");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfGroupKeyRenameOfMissingField) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$exists: false}}},
+        {$group: {_id: '$x'}}
+    ])");
+    // $group turns a missing key into null, so types do not flow through it.
+    runTest([&] { ASSERT_EQ(graph->getType_forTest(nullptr, "_id").toDebugString(), "any"); });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
