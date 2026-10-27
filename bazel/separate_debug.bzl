@@ -16,18 +16,6 @@ CC_SHARED_LIBRARY_SUFFIX = "_shared"
 SHARED_ARCHIVE_SUFFIX = "_shared_archive"
 MAC_DEBUG_FOLDER_EXTENSION = ".dSYM"
 
-def _gdb_index_message_impl(ctx):
-    if not ctx.attr.enabled:
-        print("WARNING: GDB index generation is disabled for this build. To add an index to a binary, run: bazel run gdb-add-index -- <path-to-binary>. CI compile tasks disable index generation explicitly.")
-    return [DefaultInfo()]
-
-gdb_index_message = rule(
-    implementation = _gdb_index_message_impl,
-    attrs = {
-        "enabled": attr.bool(mandatory = True),
-    },
-)
-
 def flat_solib_name(short_path):
     """
     Map a library's workspace-relative path to a unique, flat file name in _solib_<cpu>.

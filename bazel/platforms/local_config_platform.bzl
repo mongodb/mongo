@@ -76,7 +76,6 @@ def _setup_local_config_platform(ctx):
     result = None
     platform_key = "{distro}_{arch}".format(distro = distro, arch = arch)
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = toolchain_arch)
-    print("Trying to find toolchain for {}".format(toolchain_key))
     toolchain_exists = False
     for version in TOOLCHAIN_MAP:
         if toolchain_key in TOOLCHAIN_MAP[version]:
@@ -95,9 +94,6 @@ def _setup_local_config_platform(ctx):
             ctx.os.environ.get("MONGO_HERMETIC_CONTAINER_IMAGE") or
             REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
         )
-        web_url = REMOTE_EXECUTION_CONTAINERS[distro]["web-url"]
-        dockerfile = REMOTE_EXECUTION_CONTAINERS[distro]["dockerfile"]
-        print("Local host platform is configured to use this container if doing remote execution: {} built from {}".format(web_url, dockerfile))
         exec_props = """
     exec_properties = {
         "container-image": "%s",

@@ -203,11 +203,6 @@ GDB_GENERATE_INDEX = select({
     "//conditions:default": "//bazel:gdb-generate-index-noop",
 })
 
-GDB_INDEX_MESSAGE_DATA = select({
-    "//bazel/config:gdb_index_enabled_linux": [],
-    "//conditions:default": ["//bazel:gdb-index-message"],
-})
-
 TCMALLOC_ERROR_MESSAGE = """
 Error:\n" +
     Build failed due to unsupported platform for current allocator selection:
@@ -707,7 +702,7 @@ def _mongo_cc_binary_and_test(
         "visibility": visibility,
         "testonly": testonly,
         "copts": copts,
-        "data": data + SANITIZER_DATA + ["//bazel:test_wrapper"] + GDB_INDEX_MESSAGE_DATA,
+        "data": data + SANITIZER_DATA + ["//bazel:test_wrapper"],
         "tags": tags,
         "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
