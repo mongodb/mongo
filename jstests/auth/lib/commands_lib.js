@@ -9592,7 +9592,7 @@ export const authCommandsLib = {
                 ],
                 cursor: {},
             },
-            testcases: testcases_transformationOnly,
+            testcases: testcases_transformationOnlyExpectFail,
         },
         {
             testname: "aggregate_$_internalConvertBucketIndexStats",
@@ -10696,11 +10696,13 @@ export const authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    expectFail: true,
                 },
                 {
                     runOnDb: firstDbName,
                     roles: {__system: 1},
                     privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    expectFail: true,
                 },
             ],
         },

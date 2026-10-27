@@ -10,7 +10,9 @@
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    # listCollections is tested, so the test cannot run with garbage in config databases
- *    injected_catalog_metadata_incompatible
+ *    injected_catalog_metadata_incompatible,
+ *    # The internal client connection used to run $_internalListCollections requires a mongod.
+ *    assumes_against_mongod_not_mongos
  * ]
  */
 
@@ -18,24 +20,37 @@ import {
     isViewfulTimeseriesOnlySuite,
     isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 const dbTest1 = db.getSiblingDB(jsTestName() + "1");
 const dbTest2 = db.getSiblingDB(jsTestName() + "2");
 const adminDB = db.getSiblingDB("admin");
 const configDB = db.getSiblingDB("config");
 
-const isBalancerEnabled = TestData.runningWithBalancer;
+function makeInternalConn() {
+    const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+    const host = topology.type === Topology.kStandalone ? topology.mongod : topology.primary;
+    const internalConn = new Mongo(host);
+    assert.commandWorked(
+        internalConn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    return internalConn;
+}
 
-function removeUuidField(listOfCollections) {
-    let listResult = listOfCollections.map((entry) => {
-        const {
-            info: {uuid: uuid, ...infoWithoutUuid},
-            ...entryWithoutInfo
-        } = entry;
-        return {info: infoWithoutUuid, ...entryWithoutInfo};
+function aggregateOnInternalConn(dbName, pipeline) {
+    let result;
+    assert.soonNoExcept(() => {
+        const internalConn = makeInternalConn();
+        result = internalConn
+            .getDB(dbName)
+            .aggregate(pipeline, {readConcern: {}, writeConcern: {w: "majority"}})
+            .toArray();
+        return true;
     });
-    return listResult;
+    return result;
 }
 
 function removePrimaryField(listOfCollections) {
@@ -44,16 +59,6 @@ function removePrimaryField(listOfCollections) {
         return {...entryWithoutPrimary};
     });
     return listResult;
-}
-
-function removeRecordIdsReplicatedField(listOfCollections) {
-    return listOfCollections.map((entry) => {
-        const {
-            info: {recordIdsReplicated: _, ...infoWithoutRecordIdsReplicated},
-            ...entryWithoutInfo
-        } = entry;
-        return {info: infoWithoutRecordIdsReplicated, ...entryWithoutInfo};
-    });
 }
 
 // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
@@ -105,18 +110,6 @@ function compareInternalListCollectionsStageAgainstListCollections(
         const {name: name, ...entryWithoutName} = entry;
         return {ns: dbTest.getName() + "." + name, db: dbTest.getName(), ...entryWithoutName};
     });
-    if (isBalancerEnabled) {
-        // The uuid may change if there are moveCollection operations on the background, therefore
-        // we don't check it.
-        listCollectionsResponse = removeUuidField(listCollectionsResponse);
-
-        // Temporary collections related to resharding may exist in the '<db>.system.*' namespace.
-        // These are created by background moveCollection operations and should be filtered out
-        // to pass the following checks.
-        listCollectionsResponse = listCollectionsResponse.filter((collEntry) => {
-            return !collEntry["ns"].includes("resharding");
-        });
-    }
 
     const listCollectionsBuckets = getBucketCollections(listCollectionsResponse);
     listCollectionsResponse = normalizeTimeseriesCollectionFormat(listCollectionsResponse);
@@ -124,23 +117,11 @@ function compareInternalListCollectionsStageAgainstListCollections(
 
     // Check that all the collections returned by `listCollections` are also returned by
     // `$_internalListCollections`.
-    let internalStageResponseAgainstDbTest = dbTest
-        .aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
-        .toArray();
-    if (isBalancerEnabled) {
-        // The uuid may change if there are moveCollection operations on the background, therefore
-        // we don't check it.
-        internalStageResponseAgainstDbTest = removeUuidField(internalStageResponseAgainstDbTest);
-    }
+    let internalStageResponseAgainstDbTest = aggregateOnInternalConn(dbTest.getName(), [
+        {$_internalListCollections: {}},
+        {$match: {ns: {$not: /resharding/}}},
+    ]);
     internalStageResponseAgainstDbTest = removePrimaryField(internalStageResponseAgainstDbTest);
-    if (FixtureHelpers.isMongos(dbTest)) {
-        // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
-        // internal field that can be inconsistent across shards. $_internalListCollections returns
-        // it unconditionally, so remove it before comparing.
-        internalStageResponseAgainstDbTest = removeRecordIdsReplicatedField(
-            internalStageResponseAgainstDbTest,
-        );
-    }
 
     const internalListCollectionsBuckets = getBucketCollections(internalStageResponseAgainstDbTest);
     internalStageResponseAgainstDbTest = normalizeTimeseriesCollectionFormat(
@@ -163,20 +144,10 @@ function compareInternalListCollectionsStageAgainstListCollections(
 
     // Check that the collections returned by listCollections are also returned by
     // $_internalListCollections when it runs against the 'admin' db.
-    let stageResponseAgainstAdminDb = dbTest
-        .getSiblingDB("admin")
-        .aggregate([{$_internalListCollections: {}}])
-        .toArray();
-    if (isBalancerEnabled) {
-        stageResponseAgainstAdminDb = removeUuidField(stageResponseAgainstAdminDb);
-    }
+    let stageResponseAgainstAdminDb = aggregateOnInternalConn("admin", [
+        {$_internalListCollections: {}},
+    ]);
     stageResponseAgainstAdminDb = removePrimaryField(stageResponseAgainstAdminDb);
-    if (FixtureHelpers.isMongos(dbTest)) {
-        // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
-        // internal field that can be inconsistent across shards. $_internalListCollections returns
-        // it unconditionally, so remove it before comparing.
-        stageResponseAgainstAdminDb = removeRecordIdsReplicatedField(stageResponseAgainstAdminDb);
-    }
     stageResponseAgainstAdminDb = normalizeTimeseriesCollectionFormat(stageResponseAgainstAdminDb);
 
     listCollectionsResponse.forEach((entry) => {
@@ -243,30 +214,6 @@ function runTestOnDb(dbTest) {
     assert.commandWorked(dbTest.createView("view2", "coll2", []));
     compareInternalListCollectionsStageAgainstListCollections(dbTest, ++numCollections);
 
-    // Sharded collections
-    if (FixtureHelpers.isMongos(dbTest)) {
-        assert.commandWorked(
-            dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded1", key: {x: 1}}),
-        );
-        compareInternalListCollectionsStageAgainstListCollections(dbTest, ++numCollections);
-
-        assert.commandWorked(
-            dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded2", key: {x: 1}}),
-        );
-        compareInternalListCollectionsStageAgainstListCollections(dbTest, ++numCollections);
-
-        // Timeseries-sharded collection
-        assert.commandWorked(
-            dbTest.adminCommand({
-                shardCollection: dbTest.getName() + ".collShardedTim1",
-                key: {t: 1},
-                timeseries: {timeField: "t"},
-            }),
-        );
-        ++numCollections;
-        compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
-    }
-
     // Timeseries collections
     assert.commandWorked(dbTest.createCollection("collTim1", {timeseries: {timeField: "t"}}));
     ++numCollections;
@@ -281,9 +228,10 @@ function runInternalCollectionsTest(dbTest) {
     // Check that $_internalListCollections returns collections for "admin" db.
     assert.soon(() => {
         const adminCollsListCollections = adminDB.getCollectionInfos();
-        const adminCollsInternalListCollections = adminDB
-            .aggregate([{$_internalListCollections: {}}, {$match: {db: "admin"}}])
-            .toArray();
+        const adminCollsInternalListCollections = aggregateOnInternalConn("admin", [
+            {$_internalListCollections: {}},
+            {$match: {db: "admin"}},
+        ]);
 
         if (adminCollsListCollections.length != adminCollsInternalListCollections.length) {
             jsTestLog(
@@ -304,9 +252,10 @@ function runInternalCollectionsTest(dbTest) {
     // db.
     assert.soon(() => {
         const configCollsListCollections = configDB.getCollectionInfos();
-        const configCollsInternalListCollections = adminDB
-            .aggregate([{$_internalListCollections: {}}, {$match: {db: "config"}}])
-            .toArray();
+        const configCollsInternalListCollections = aggregateOnInternalConn("admin", [
+            {$_internalListCollections: {}},
+            {$match: {db: "config"}},
+        ]);
 
         if (configCollsListCollections.length != configCollsInternalListCollections.length) {
             jsTestLog(
@@ -327,9 +276,9 @@ function runInternalCollectionsTest(dbTest) {
     // db.
     assert.soon(() => {
         const configCollsListCollections = configDB.getCollectionInfos();
-        const configCollsInternalListCollections = configDB
-            .aggregate([{$_internalListCollections: {}}])
-            .toArray();
+        const configCollsInternalListCollections = aggregateOnInternalConn("config", [
+            {$_internalListCollections: {}},
+        ]);
 
         if (configCollsListCollections.length != configCollsInternalListCollections.length) {
             jsTestLog(

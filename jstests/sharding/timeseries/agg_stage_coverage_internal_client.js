@@ -33,6 +33,13 @@ assert.commandWorked(
         writeConcern: {w: "majority"},
     }),
 );
+assert.commandWorked(
+    internalDB.runCommand({
+        createIndexes: tsColl.getName(),
+        indexes: [{key: {"m.loc": "2dsphere"}, name: "m.loc_2dsphere"}],
+        writeConcern: {w: "majority"},
+    }),
+);
 // Insert 10 documents, so the aggregation stages will return some documents to confirm the aggregation stage worked.
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(
@@ -68,6 +75,19 @@ const tests = [
         zeroDocsReturned: true,
     },
     {stage: "$setMetadata", pipeline: [{$setMetadata: {score: "$value"}}]},
+    {
+        stage: "$_internalComputeGeoNearDistance",
+        pipeline: [
+            {
+                $_internalComputeGeoNearDistance: {
+                    key: "m.loc",
+                    distanceField: "dist",
+                    distanceMultiplier: 1,
+                    near: {type: "Point", coordinates: [106.65589, 10.787627]},
+                },
+            },
+        ],
+    },
 ];
 
 tests.forEach((test) => {
