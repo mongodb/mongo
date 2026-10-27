@@ -97,6 +97,8 @@ last-patch:
       ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_data_consistent_after_sync_source_clean_restart.js
       ticket: SERVER-132245
+    - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
+      ticket: SERVER-136085
     - test_file: jstests/sharding/collection_uuid_find.js
       ticket: SERVER-134519
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js
@@ -230,6 +232,8 @@ last-continuous:
       ticket: SERVER-132245
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-125964
+    - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
+      ticket: SERVER-136085
     - test_file: jstests/sharding/collection_uuid_find.js
       ticket: SERVER-134519
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js
@@ -419,6 +423,8 @@ last-lts:
       ticket: SERVER-132245
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-125964
+    - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
+      ticket: SERVER-136085
     - test_file: jstests/sharding/collection_uuid_find.js
       ticket: SERVER-134519
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js

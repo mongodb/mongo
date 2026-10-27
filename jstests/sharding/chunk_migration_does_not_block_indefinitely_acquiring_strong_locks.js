@@ -76,13 +76,6 @@ const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB("admin"),
     "AuthoritativeShardsDDL",
 );
-const shard0PrimaryVersion = assert.commandWorked(
-    st.rs0.getPrimary().getDB("admin").runCommand({buildInfo: 1}),
-).version;
-const shard0PrimaryUsesLastLTSBinary = MongoRunner.areBinVersionsTheSame(
-    shard0PrimaryVersion,
-    MongoRunner.getBinVersionFor("last-lts"),
-);
 
 const dbName = "test";
 const collName = "foo";
@@ -144,9 +137,12 @@ assert.commandWorked(
     testMigrationFailsAndWritesAreNotBlocked();
 
     // TODO(SERVER-135801): Remove this conditional check once 10.0 is last LTS.
-    if (usesMoveRangeCoordinatorPath && !shard0PrimaryUsesLastLTSBinary) {
-        // The MoveRangeCoordinator encountering the lock timeout should preserve the legacy moveRange
-        // warning severity. Last-LTS binaries do not include the new severity handling.
+    if (usesMoveRangeCoordinatorPath) {
+        // Before 9.0, the legacy migration path logged donor LockTimeout failures as warnings.
+        // The AuthShard MoveRangeCoordinator path introduced in v9.0 instead logged them
+        // as errors. In v9.1 warning severity has been restored, matching the legacy path.
+        // Last-LTS binaries lack this coordinator severity fix, and last-patch binaries may
+        // predate it, so this assertion is skipped when the donor primary uses either binary.
         assert(
             checkLog.checkContainsOnceJson(st.shard0, 13580300, {}, "W"),
             "Expected MoveRangeCoordinator LockTimeout to be logged as a warning",
