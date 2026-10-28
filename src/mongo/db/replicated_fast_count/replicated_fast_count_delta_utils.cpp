@@ -106,6 +106,9 @@ void recordCollectionReplicatedMetadataDelta(
     }
 }
 
+// TODO(SERVER-119213): This function exists to help replicated fast count gain coverage in ASC
+// tests that use the importCollection command. Remove this function once the importCollection
+// command is removed.
 void recordCollectionImport(const UUID& uuid,
                             const ImportCollectionOplogEntry& importEntry,
                             ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
