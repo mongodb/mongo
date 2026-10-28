@@ -64,6 +64,7 @@ mongo_cc_library(
         ":rate_limiting",
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:commands",
+        "//src/mongo/db/stats:internal_operation",
         "//src/mongo/util:buildinfo",
     ],
 )
@@ -122,6 +123,7 @@ mongo_cc_unit_test(
         "distinct_key_test.cpp",
         "find_key_test.cpp",
         "insert_key_test.cpp",
+        "is_internal_test.cpp",
         "key_test.cpp",
         "query_stats_store_test.cpp",
         "query_stats_test.cpp",

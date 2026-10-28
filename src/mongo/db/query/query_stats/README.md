@@ -62,6 +62,29 @@ are type aliases for `WriteKey<UpdateCommandRequest>`, `WriteKey<InsertCommandRe
 `WriteKey<DeleteCommandRequest>` respectively. See [Write Commands](#write-commands) below for how
 these keys are registered.
 
+#### `isInternal`
+
+The key includes an `isInternal` field, present only when `true`, so consumers can filter out
+server-owned work with `{"key.isInternal": {$ne: true}}`. Keys of other operations are unchanged.
+
+An operation is internal when it performs work owned by a server subsystem (e.g. resharding, chunk
+migration) rather than executing a client's command. What matters is whose work it is, not who
+triggered it: cloning started by a user's `reshardCollection` is internal; the per-shard requests
+mongos sends to execute a user's command are not. As a test, ask whether the work would continue if
+the client disconnected (subsystem-owned, so internal) or is part of executing the client's request
+(not internal). By this test, the two-phase write without shard key, targeted shard requests,
+`$lookup` sub-reads and retryable-write internal transactions are not internal.
+
+The field reflects the [`isInternalOperation`](../../stats/internal_operation.h) operation
+decoration. It is never inferred from connection state; the subsystem sets it explicitly with
+`markInternalOperation(opCtx)` at the root of its work. DBDirectClient sub-operations share the
+opCtx and so inherit it. The egress metadata hook forwards it to remote commands as the
+`isInternalOperation` generic argument once FCV reaches the version that enables
+`featureFlagInternalOperationOrigin`, and the receiving node accepts it only from internally
+authorized clients. Work that is not stamped, or whose flag is lost on a path without the egress
+hook, is reported as not internal: the field can miss internal work but never marks a client's
+command as internal.
+
 ### Query Stats Store Cache Size
 
 The size of the`QueryStatsStore` can be set by the server parameter

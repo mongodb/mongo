@@ -5,6 +5,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo::query_stats {
@@ -72,7 +73,8 @@ UniversalKeyComponents::UniversalKeyComponents(
     query_shape::CollectionType collectionType,
     bool maxTimeMS,
     boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash,
-    bool inTransaction)
+    bool inTransaction,
+    bool isInternal)
     : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
@@ -98,6 +100,7 @@ UniversalKeyComponents::UniversalKeyComponents(
           .maxTimeMS = maxTimeMS,
           .tenantId = getTenantId(_queryShape.get()).has_value(),
           .originalQueryShapeHash = bool(originalQueryShapeHash),
+          .isInternal = isInternal,
       } {
     tassert(7973600, "shape must not be null", _queryShape);
 }
@@ -185,6 +188,9 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob,
     if (_inTransaction) {
         bob.append("inTransaction", true);
     }
+    if (_hasField.isInternal) {
+        bob.append("isInternal", true);
+    }
     if (!_hintObj.isEmpty()) {
         bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
     }
@@ -218,7 +224,8 @@ Key::Key(OperationContext* opCtx,
           collectionType,
           hasMaxTimeMS,
           originalQueryShapeHash,
-          opCtx->inMultiDocumentTransaction()) {}
+          opCtx->inMultiDocumentTransaction(),
+          isInternalOperation(opCtx)) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
                     const query_shape::SerializationOptions& opts,

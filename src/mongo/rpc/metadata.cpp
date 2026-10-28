@@ -53,6 +53,7 @@
 namespace mongo {
 namespace rpc {
 MONGO_FAIL_POINT_DEFINE(failIfOperationKeyMismatch);
+MONGO_FAIL_POINT_DEFINE(stampIsInternalOperation);
 
 BSONObj makeEmptyMetadata() {
     return BSONObj();
@@ -140,6 +141,12 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
                 hasInternalAuthorization());
         markInternalOperation(opCtx);
     }
+    stampIsInternalOperation.executeIf(
+        [&](const BSONObj&) { markInternalOperation(opCtx); },
+        [&](const BSONObj& data) {
+            const auto& comment = requestArgs.getComment();
+            return comment && data["comment"].woCompare(comment->getElement()) == 0;
+        });
 
     // Typed commands which go through TypedCommand::InvocationBaseInternal will already have this
     // installed, but we keep the install check here to ensure even legacy commands can benefit from

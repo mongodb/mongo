@@ -47,7 +47,8 @@ struct UniversalKeyComponents {
         query_shape::CollectionType collectionType,
         bool maxTimeMS,
         boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash = boost::none,
-        bool inTransaction = false);
+        bool inTransaction = false,
+        bool isInternal = false);
     /**
      * Returns a copy of the read concern object. If there is an "afterClusterTime" or
      * "atClusterTime" component, the timestamp is shapified according to 'opts'.
@@ -115,6 +116,7 @@ struct UniversalKeyComponents {
         bool maxTimeMS : 1 = false;
         bool tenantId : 1 = false;
         bool originalQueryShapeHash : 1 = false;
+        bool isInternal : 1 = false;
     } _hasField;
 };
 
@@ -187,7 +189,8 @@ H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
                       hasField.readConcern,
                       hasField.maxTimeMS,
                       hasField.tenantId,
-                      hasField.originalQueryShapeHash);
+                      hasField.originalQueryShapeHash,
+                      hasField.isInternal);
 }
 
 
