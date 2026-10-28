@@ -75,10 +75,10 @@ public:
 };
 
 TEST_F(WiredTigerPrepareConflictTest, IgnoreBehaviorClassification) {
-    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::kEnforce));
-    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::kThrow));
-    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflicts));
-    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::kIgnoreConflictsAllowWrites));
+    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::block));
+    EXPECT_FALSE(ignoresPrepareConflicts(PrepareConflictBehavior::throwException));
+    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::ignoreAndDisallowWrites));
+    EXPECT_TRUE(ignoresPrepareConflicts(PrepareConflictBehavior::ignoreAndAllowWrites));
 }
 
 TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
@@ -141,7 +141,7 @@ TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {
 }
 
 TEST_F(WiredTigerPrepareConflictTest, ThrowPrepareConflictCountsWithoutWaiting) {
-    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
     recoveryUnit->setBlockingAllowed(false);
     auto generation = recoveryUnit->getPrepareCommitOrAbortCount();
     auto conflictsBefore = PrepareConflictTracker::getGlobalNumPrepareConflicts();
@@ -164,7 +164,7 @@ TEST_F(WiredTigerPrepareConflictTest, ThrowPrepareConflictCountsWithoutWaiting) 
 }
 
 TEST_F(WiredTigerPrepareConflictTest, ResolutionBetweenReadAndWaitIsNotLost) {
-    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
     auto* connection = WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
     PrepareConflictTracker tracker;
     try {
@@ -182,7 +182,7 @@ TEST_F(WiredTigerPrepareConflictTest, ResolutionBetweenReadAndWaitIsNotLost) {
 }
 
 TEST_F(WiredTigerPrepareConflictTest, NotificationDoesNotSuppressAnotherConflict) {
-    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    recoveryUnit->setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
     auto* connection = WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
     PrepareConflictTracker tracker;
     auto conflictsBefore = PrepareConflictTracker::getGlobalNumPrepareConflicts();

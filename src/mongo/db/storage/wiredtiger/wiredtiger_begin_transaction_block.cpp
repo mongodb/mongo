@@ -25,15 +25,13 @@ using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
 
 static int getIgnorePrepareConfig(PrepareConflictBehavior behavior) {
     switch (behavior) {
-        case PrepareConflictBehavior::kEnforce:
-        case PrepareConflictBehavior::kThrow:
+        case PrepareConflictBehavior::block:
+        case PrepareConflictBehavior::throwException:
             return 0;
-        case PrepareConflictBehavior::kIgnoreConflicts:
+        case PrepareConflictBehavior::ignoreAndDisallowWrites:
             return 1;
-        case PrepareConflictBehavior::kIgnoreConflictsAllowWrites:
+        case PrepareConflictBehavior::ignoreAndAllowWrites:
             return 2;
-        case PrepareConflictBehavior::kMax:
-            MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
 }

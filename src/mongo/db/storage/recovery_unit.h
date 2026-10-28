@@ -40,13 +40,13 @@ enum class PrepareConflictBehavior {
     /**
      * When prepare conflicts are encountered, block until the conflict is resolved.
      */
-    kEnforce = 0,
+    block = 0,
 
     /**
      * When a prepare conflict is encountered, throw an exception. Callers must unwind their WUOW
      * and release locks before waiting for resolution and retrying.
      */
-    kThrow,
+    throwException,
 
     /**
      * Ignore prepare conflicts when they are encountered.
@@ -57,31 +57,26 @@ enum class PrepareConflictBehavior {
      * ignore prepared updates may only perform reads. This is to prevent updating a record based on
      * an older version of itself, because a write conflict will not be generated in this scenario.
      */
-    kIgnoreConflicts,
+    ignoreAndDisallowWrites,
 
     /**
      * Ignore prepare conflicts when they are encountered, and allow operations to perform writes,
-     * an exception to the rule of kIgnoreConflicts.
+     * an exception to the rule of ignoreAndDisallowWrites.
      *
      * This should only be used in cases where this is known to be impossible to perform writes
      * based on other prepared updates.
      */
-    kIgnoreConflictsAllowWrites,
-
-    /** kMax should always be last and is a counter of the number of enum values. */
-    kMax,
+    ignoreAndAllowWrites,
 };
 
 inline bool ignoresPrepareConflicts(PrepareConflictBehavior behavior) {
     switch (behavior) {
-        case PrepareConflictBehavior::kEnforce:
-        case PrepareConflictBehavior::kThrow:
+        case PrepareConflictBehavior::block:
+        case PrepareConflictBehavior::throwException:
             return false;
-        case PrepareConflictBehavior::kIgnoreConflicts:
-        case PrepareConflictBehavior::kIgnoreConflictsAllowWrites:
+        case PrepareConflictBehavior::ignoreAndDisallowWrites:
+        case PrepareConflictBehavior::ignoreAndAllowWrites:
             return true;
-        case PrepareConflictBehavior::kMax:
-            MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
 }
@@ -242,10 +237,10 @@ public:
 
     /**
      * Returns the behavior of handling conflicts that are encountered due to prepared transactions.
-     * Defaults to kEnforce if prepared transactions are not supported by this storage engine.
+     * Defaults to block if prepared transactions are not supported by this storage engine.
      */
     virtual PrepareConflictBehavior getPrepareConflictBehavior() const {
-        return PrepareConflictBehavior::kEnforce;
+        return PrepareConflictBehavior::block;
     }
 
     /**

@@ -170,7 +170,7 @@ TEST_F(ExpressExecutorTest, orphanIndexKeyReturnsEofOnPlainRead) {
 
     // Matches what the command layer gives an ordinary find, which is the configuration that spun.
     shard_role_details::getRecoveryUnit(operationContext())
-        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndAllowWrites);
 
     auto cq = canonicalizeFindByA();
     auto index = indexForA(collection.getCollectionPtr(), *cq);

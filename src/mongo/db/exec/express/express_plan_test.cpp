@@ -481,7 +481,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyOnPlainRead) {
     // Must come after the orphaning step above, whose committed WriteUnitOfWork closes the storage
     // transaction: 'setPrepareConflictBehavior()' invariants on '!_isActive()'.
     shard_role_details::getRecoveryUnit(operationContext())
-        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndDisallowWrites);
 
     assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
 }
@@ -523,7 +523,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyTruncatesRemaini
     ASSERT_EQ(collection.getCollectionPtr()->numRecords(operationContext()), 2);
 
     shard_role_details::getRecoveryUnit(operationContext())
-        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndDisallowWrites);
 
     assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
 }
@@ -537,8 +537,8 @@ class ExpressPlanPrepareConflictTest : public ExpressPlanTest,
 
 INSTANTIATE_TEST_SUITE_P(AllEnforcementBehaviors,
                          ExpressPlanPrepareConflictTest,
-                         testing::Values(PrepareConflictBehavior::kEnforce,
-                                         PrepareConflictBehavior::kThrow));
+                         testing::Values(PrepareConflictBehavior::block,
+                                         PrepareConflictBehavior::throwException));
 
 TEST_P(ExpressPlanPrepareConflictTest,
        TestLookupViaUserIndexWithOrphanIndexKeyThrowsWhenEnforcingPrepareConflicts) {

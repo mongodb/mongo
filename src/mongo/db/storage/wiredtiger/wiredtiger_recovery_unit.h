@@ -343,7 +343,7 @@ private:
     bool _readSourcePinned = false;
 
     // The behavior of handling prepare conflicts.
-    PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::kEnforce};
+    PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::block};
     Timestamp _commitTimestamp;
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;

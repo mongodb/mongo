@@ -7617,7 +7617,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     {
         OneOffRead oor(opCtx, prepTs);
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflicts);
+            PrepareConflictBehavior::ignoreAndDisallowWrites);
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,
             Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError));

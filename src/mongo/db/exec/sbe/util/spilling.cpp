@@ -39,7 +39,7 @@ void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
             "The operation must be ignoring conflicts and allowing writes or enforcing prepare "
             "conflicts entirely",
             shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() !=
-                PrepareConflictBehavior::kIgnoreConflicts);
+                PrepareConflictBehavior::ignoreAndDisallowWrites);
 }
 
 std::pair<RecordId, key_string::TypeBits> encodeKeyString(

@@ -1637,7 +1637,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
         ru2.beginUnitOfWork(false);
         // Not strictly necessary to begin a transaction, but used to verify that starting a
         // transaction can handle extra configuration options when claim_prepared_id is set.
-        ru2.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+        ru2.setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndDisallowWrites);
         ru2.setPrepareTimestamp(prepareTimestamp);
         ru2.setPreparedId(*recoveredPreparedId);
         ru2.getSession();  // Note this starts the storage transaction.

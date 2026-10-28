@@ -425,7 +425,7 @@ TEST_F(PipelinedWorkItemTest, SetsWorkerOpCtxStates) {
     bool observed = false;
     bool writesReplicated = true;
     bool enforcingConstraints = true;
-    auto prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
+    auto prepareConflictBehavior = PrepareConflictBehavior::block;
     auto admissionPriority = AdmissionContext::Priority::kNormal;
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
@@ -444,7 +444,7 @@ TEST_F(PipelinedWorkItemTest, SetsWorkerOpCtxStates) {
     ASSERT_TRUE(observed);
     ASSERT_FALSE(writesReplicated);
     ASSERT_FALSE(enforcingConstraints);
-    ASSERT_EQ(prepareConflictBehavior, PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    ASSERT_EQ(prepareConflictBehavior, PrepareConflictBehavior::ignoreAndAllowWrites);
     ASSERT_EQ(admissionPriority, AdmissionContext::Priority::kExempt);
 }
 

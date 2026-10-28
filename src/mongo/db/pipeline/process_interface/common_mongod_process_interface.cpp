@@ -132,7 +132,8 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
             "Expected operation to either be blocking on prepare conflicts or ignoring prepare "
             "conflicts and allowing writes",
             shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
-                    ->getPrepareConflictBehavior() != PrepareConflictBehavior::kIgnoreConflicts);
+                    ->getPrepareConflictBehavior() !=
+                PrepareConflictBehavior::ignoreAndDisallowWrites);
 }
 
 /**

@@ -3675,7 +3675,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
         // prepare operations wait for index builds to complete.
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+            PrepareConflictBehavior::ignoreAndAllowWrites);
 
         if (resumeInfo) {
             LOGV2(12500800,

@@ -47,7 +47,8 @@ int wiredTigerPrepareConflictRetry(Interruptible& interruptible,
                                    PrepareConflictTracker& tracker,
                                    RecoveryUnit& ru,
                                    F&& f) {
-    const auto generation = ru.getPrepareConflictBehavior() == PrepareConflictBehavior::kThrow
+    const auto generation =
+        ru.getPrepareConflictBehavior() == PrepareConflictBehavior::throwException
         ? boost::make_optional(ru.getPrepareCommitOrAbortCount())
         : boost::none;
     int ret = WT_READ_CHECK(f());

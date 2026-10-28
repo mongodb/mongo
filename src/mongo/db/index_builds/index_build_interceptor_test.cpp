@@ -320,7 +320,7 @@ TEST_P(IndexBuilderInterceptorDrainTailTest, CapturePhysicalTailAndRetainAfterAb
             operationContext(), reader, doc.objdata(), doc.objsize(), Timestamp()));
         wuow.commit();
     }
-    reader.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+    reader.setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndDisallowWrites);
     auto writer = operationContext()->getServiceContext()->getStorageEngine()->newRecoveryUnit();
     StorageWriteTransaction txn{*writer};
     auto invisible = unittest::assertGet(table->insertRecord(
@@ -374,7 +374,7 @@ TEST_P(IndexBuilderInterceptorDrainTailTest, ReversePrefixAndForwardReadShareVis
     }
     ASSERT_GT(newer, tail);
     reader.abandonSnapshot();
-    reader.setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    reader.setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
 
     {
         WriteUnitOfWork wuow{operationContext()};
@@ -437,7 +437,7 @@ TEST_F(IndexBuilderInterceptorTest, TimestampInvisiblePrefixRemainsInvisibleAfte
         wuow.commit();
     }
     reader.abandonSnapshot();
-    reader.setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+    reader.setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
     reader.setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp{1, 1});
     {
         WriteUnitOfWork wuow{operationContext()};
@@ -1230,7 +1230,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
     interceptor->captureInitialDrainTail(operationContext());
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     ru.abandonSnapshot();
-    ru.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    ru.setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndAllowWrites);
     for (auto yieldPolicy : {IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                              IndexBuildInterceptor::DrainYieldPolicy::kYield}) {
         interceptor->recordDrainedMultikeyPaths(MultikeyPaths{{0}});
@@ -1241,7 +1241,8 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
                 entry,
                 InsertDeleteOptions{.dupsAllowed = true},
                 [&](OperationContext*, const MultikeyPaths&) -> Status {
-                    EXPECT_EQ(ru.getPrepareConflictBehavior(), PrepareConflictBehavior::kThrow);
+                    EXPECT_EQ(ru.getPrepareConflictBehavior(),
+                              PrepareConflictBehavior::throwException);
                     uasserted(PrepareConflictInfo(0),
                               "Injected prepare conflict after applying keys");
                 },
@@ -1256,8 +1257,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
                         testing::Throws<ExceptionFor<ErrorCodes::PrepareConflict>>(
                             unittest::match::CodeIs(ErrorCodes::PrepareConflict)));
         }
-        EXPECT_EQ(ru.getPrepareConflictBehavior(),
-                  PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        EXPECT_EQ(ru.getPrepareConflictBehavior(), PrepareConflictBehavior::ignoreAndAllowWrites);
         EXPECT_EQ(getSideWritesTableContents(info).size(), 2u);
         EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 0);
         auto cursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
@@ -1279,8 +1279,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
     EXPECT_TRUE(recovered);
     EXPECT_TRUE(getSideWritesTableContents(info).empty());
     EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 2);
-    EXPECT_EQ(ru.getPrepareConflictBehavior(),
-              PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    EXPECT_EQ(ru.getPrepareConflictBehavior(), PrepareConflictBehavior::ignoreAndAllowWrites);
 }
 
 TEST_F(IndexBuilderInterceptorTest, LaterConflictEndsPreReadinessDrain) {
@@ -1325,7 +1324,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, PreparedWriteBeyondInitiallyE
     auto table = getTable(*info.sideWritesIdent);
     auto& reader = *shard_role_details::getRecoveryUnit(operationContext());
     reader.abandonSnapshot();
-    reader.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    reader.setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndAllowWrites);
 
     auto writer = operationContext()->getServiceContext()->getStorageEngine()->newRecoveryUnit();
     StorageWriteTransaction txn{*writer};
@@ -1357,7 +1356,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, PreparedWriteBeyondInitiallyE
         EXPECT_TRUE(interceptor->captureInitialDrainTail(operationContext()).isNull());
         EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 0);
         EXPECT_EQ(reader.getPrepareConflictBehavior(),
-                  PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+                  PrepareConflictBehavior::ignoreAndAllowWrites);
     }
     txn.abort();
     EXPECT_OK(drain());

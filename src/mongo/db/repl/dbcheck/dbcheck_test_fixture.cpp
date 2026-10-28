@@ -193,7 +193,7 @@ Status DbCheckTest::runHashForCollectionCheck(
     int64_t maxBytes,
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
-        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
+        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::block);
     const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
@@ -221,7 +221,7 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
     int64_t maxBytes,
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
-        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
+        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::block);
     const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),

@@ -1007,7 +1007,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
 
     if (repair) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+            PrepareConflictBehavior::ignoreAndAllowWrites);
     }
 
     return {validateMode,
@@ -1191,7 +1191,7 @@ Status validate(OperationContext* opCtx,
 
     if (validateState.fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
-        // needs kIgnoreConflictsAllowWrites, but validate repair at startup cannot set that here
+        // needs ignoreAndAllowWrites, but validate repair at startup cannot set that here
         // due to an already active WriteUnitOfWork.  The prepare conflict behavior for validate
         // command with repair is set in the command code prior to this point.
         invariant(!validateState.isBackground());
@@ -1199,10 +1199,10 @@ Status validate(OperationContext* opCtx,
         // Foreground validation may perform writes to fix up inconsistencies that are not
         // correctness errors.
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+            PrepareConflictBehavior::ignoreAndAllowWrites);
     } else {
         // isBackground().
-        invariant(snapshotGuard.getPrepareConflictBehavior() == PrepareConflictBehavior::kEnforce);
+        invariant(snapshotGuard.getPrepareConflictBehavior() == PrepareConflictBehavior::block);
     }
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {

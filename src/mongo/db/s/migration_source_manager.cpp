@@ -551,7 +551,7 @@ void MigrationSourceManager::startClone() {
                             [&] { uassertStatusOK(readConcernStatus); });
 
         setPrepareConflictBehaviorForReadConcern(
-            _opCtx, readConcernArgs, PrepareConflictBehavior::kEnforce);
+            _opCtx, readConcernArgs, PrepareConflictBehavior::block);
     }
 
     _coordinator->startMigration(_opCtx);

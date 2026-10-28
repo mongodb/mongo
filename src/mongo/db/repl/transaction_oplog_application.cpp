@@ -664,7 +664,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             // prepared. We ignore prepare conflicts on recovering nodes because they may
             // may encounter prepare conflicts that did not occur on the primary.
             shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-                PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+                PrepareConflictBehavior::ignoreAndAllowWrites);
 
             // We might replay a prepared transaction behind oldest timestamp.
             RecoveryUnit::OpenSnapshotOptions openSnapshotOptions =

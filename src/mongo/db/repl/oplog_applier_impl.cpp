@@ -189,7 +189,7 @@ void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
     // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
     // did not occur on the primary.
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        PrepareConflictBehavior::ignoreAndAllowWrites);
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==

@@ -100,19 +100,19 @@ void BM_setTimestamp(benchmark::State& state) {
 }
 
 BENCHMARK(BM_WiredTigerBeginTxnBlock);
-BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::kEnforce, false);
-BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::kEnforce, true);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::block, false);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::block, true);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kIgnoreConflicts,
+                   PrepareConflictBehavior::ignoreAndDisallowWrites,
                    false);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kIgnoreConflicts,
+                   PrepareConflictBehavior::ignoreAndDisallowWrites,
                    true);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
+                   PrepareConflictBehavior::ignoreAndAllowWrites,
                    false);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
+                   PrepareConflictBehavior::ignoreAndAllowWrites,
                    true);
 BENCHMARK(BM_setTimestamp);
 

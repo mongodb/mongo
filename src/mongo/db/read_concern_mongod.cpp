@@ -282,7 +282,7 @@ void setPrepareConflictBehaviorForReadConcernImpl(OperationContext* opCtx,
     // Enforce prepare conflict behavior if the command is not eligible to ignore prepare conflicts.
     if (ignoresPrepareConflicts(prepareConflictBehavior) &&
         !canIgnorePrepareConflicts(opCtx, readConcernArgs)) {
-        prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
+        prepareConflictBehavior = PrepareConflictBehavior::block;
     }
 
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(prepareConflictBehavior);
@@ -569,9 +569,9 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
         // behavior to permit writes.
         auto originalBehavior =
             shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
-        if (originalBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
+        if (originalBehavior == PrepareConflictBehavior::ignoreAndDisallowWrites) {
             shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-                PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+                PrepareConflictBehavior::ignoreAndAllowWrites);
         }
 
         writeConflictRetry(

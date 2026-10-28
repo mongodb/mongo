@@ -2007,7 +2007,7 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
                                                  readSource,
                                                  // On the primary we must always block on prepared
                                                  // updates to guarantee snapshot isolation.
-                                                 PrepareConflictBehavior::kEnforce);
+                                                 PrepareConflictBehavior::block);
     } catch (const DBException& ex) {
         // 'DbCheckAcquisition' fails with 'CommandNotSupportedOnView' if the namespace is referring
         // to a view.

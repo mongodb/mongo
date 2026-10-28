@@ -36,11 +36,11 @@ namespace service_entry_point_shard_role_helpers {
     // Some read commands can safely ignore prepare conflicts by default because they do not
     // require snapshot isolation and do not conflict with concurrent writes. We also give these
     // operations permission to write, as this may be required for queries that spill using the
-    // storage engine. The kIgnoreConflictsAllowWrites setting suppresses an assertion in the
+    // storage engine. The ignoreAndAllowWrites setting suppresses an assertion in the
     // storage engine that prevents operations that ignore prepare conflicts from also writing.
     const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
-        ? PrepareConflictBehavior::kIgnoreConflictsAllowWrites
-        : PrepareConflictBehavior::kEnforce;
+        ? PrepareConflictBehavior::ignoreAndAllowWrites
+        : PrepareConflictBehavior::block;
     mongo::setPrepareConflictBehaviorForReadConcern(
         opCtx, repl::ReadConcernArgs::get(opCtx), prepareConflictBehavior);
 }

@@ -196,13 +196,13 @@ public:
     IgnorePrepareBlock(OperationContext* opCtx) : _opCtx(opCtx) {
         shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         shard_role_details::getRecoveryUnit(_opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflicts);
+            PrepareConflictBehavior::ignoreAndDisallowWrites);
     }
 
     ~IgnorePrepareBlock() {
         shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         shard_role_details::getRecoveryUnit(_opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kEnforce);
+            PrepareConflictBehavior::block);
     }
 
 private:

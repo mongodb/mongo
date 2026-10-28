@@ -1003,7 +1003,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             // updates. Secondaries can encounter prepared updates in normal operation if a document
             // is prepared after it has been scanned on the primary, and before the dbCheck oplog
             // entry is replicated.
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+            PrepareConflictBehavior::ignoreAndAllowWrites);
 
         // Set up the hasher,
         boost::optional<DbCheckHasher> hasher;

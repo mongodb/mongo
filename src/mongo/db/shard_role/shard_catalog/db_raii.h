@@ -149,9 +149,9 @@ public:
         auto prepareConflictBehavior = [behavior] {
             switch (behavior) {
                 case Behavior::kBlock:
-                    return PrepareConflictBehavior::kEnforce;
+                    return PrepareConflictBehavior::block;
                 case Behavior::kThrow:
-                    return PrepareConflictBehavior::kThrow;
+                    return PrepareConflictBehavior::throwException;
             }
             MONGO_UNREACHABLE;
         }();

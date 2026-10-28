@@ -328,7 +328,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
         });
 
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflicts);
+            PrepareConflictBehavior::ignoreAndDisallowWrites);
 
         auto storeCurrentRecordIdStatus = _storeCurrentRecordId(opCtx);
         if (storeCurrentRecordIdStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {

@@ -42,7 +42,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierDrain);
 void setWorkerOpCtxStates(OperationContext* opCtx) {
     opCtx->setEnforceConstraints(false);
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        PrepareConflictBehavior::ignoreAndAllowWrites);
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 }

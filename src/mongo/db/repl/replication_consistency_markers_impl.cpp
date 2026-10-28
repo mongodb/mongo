@@ -418,13 +418,13 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
         return boost::none;
     }
 
-    // Temporarily allow writes if kIgnoreConflicts is set on the recovery unit so the truncate
-    // point can be updated. The kIgnoreConflicts setting only allows reads.
+    // Temporarily allow writes if ignoreAndDisallowWrites is set on the recovery unit so the
+    // truncate point can be updated. The ignoreAndDisallowWrites setting only allows reads.
     auto originalBehavior =
         shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
-    if (originalBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
+    if (originalBehavior == PrepareConflictBehavior::ignoreAndDisallowWrites) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+            PrepareConflictBehavior::ignoreAndAllowWrites);
     }
     ON_BLOCK_EXIT([&] {
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(originalBehavior);

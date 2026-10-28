@@ -670,7 +670,7 @@ void AggExState::adjustChangeStreamReadConcern() {
     // Wait for read concern again since we changed the original read concern.
     uassertStatusOK(waitForReadConcern(_opCtx, readConcernArgs, DatabaseName(), true));
     setPrepareConflictBehaviorForReadConcern(
-        _opCtx, readConcernArgs, PrepareConflictBehavior::kIgnoreConflicts);
+        _opCtx, readConcernArgs, PrepareConflictBehavior::ignoreAndDisallowWrites);
 }
 
 std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {

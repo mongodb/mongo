@@ -364,7 +364,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ThrowModeEnforcesDefaultAndCompiledCon
     ru1->prepareUnitOfWork();
 
     for (const bool allowUntimestampedWrite : {false, true}) {
-        ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kThrow);
+        ru2->setPrepareConflictBehavior(PrepareConflictBehavior::throwException);
         if (allowUntimestampedWrite) {
             ru2->allowOneUntimestampedWrite();
         }
@@ -408,7 +408,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     // A transaction that chooses to ignore prepare conflicts does not see the record instead of
     // returning a prepare conflict.
     ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
-    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndDisallowWrites);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -429,10 +429,10 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // A transaction that chooses to ignore prepare conflicts with kIgnoreConflictsAllowWrites does
+    // A transaction that chooses to ignore prepare conflicts with ignoreAndAllowWrites does
     // not see the record
     ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
-    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndAllowWrites);
 
     // The prepared write is not visible.
     getCursor(ru2, &cursor);
