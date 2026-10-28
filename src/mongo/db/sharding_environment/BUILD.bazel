@@ -163,6 +163,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
         "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/stats:internal_operation",
         "//src/mongo/executor:async_multicaster",
         "//src/mongo/executor:connection_pool_executor",
         "//src/mongo/executor:scoped_task_executor",

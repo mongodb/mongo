@@ -11,6 +11,7 @@
 #include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -88,6 +89,13 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
                 .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx),
                                                          fcvSnap)) {
             metadataBob->appendBool(kIsExternalClientOnRouterFieldName, true);
+        }
+
+        if (isInternalOperation(opCtx) &&
+            repl::feature_flags::gFeatureFlagInternalOperationOrigin
+                .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx),
+                                                         fcvSnap)) {
+            metadataBob->appendBool(kIsInternalOperationFieldName, true);
         }
 
         if (const auto& retryAttempt = staleConfigRetryAttempt(opCtx); retryAttempt.has_value() &&

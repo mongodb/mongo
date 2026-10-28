@@ -418,6 +418,15 @@ structs:
                 # command BSON. See also: rawData, isDirectSystemBucketsAccess.
                 forward_to_shards: false
                 stability: "internal"
+            # Set by a node when the operation is server-initiated work (e.g. resharding, chunk
+            # migration) so the receiving node can mark it as internal in user-facing metrics such
+            # as $queryStats. Only accepted from internally-authorized clients.
+            isInternalOperation:
+                type: optionalBool
+                # Manually appended by the egress metadata hook, not present in the original
+                # command BSON. See also: isExternalClientOnRouter.
+                forward_to_shards: false
+                stability: "internal"
             # Set by the router on versioned requests to indicate how many times the router loop has
             # retried this operation on a StaleConfig error.
             staleConfigRetryAttempt:

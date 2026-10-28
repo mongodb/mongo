@@ -25,6 +25,9 @@ filters:
   - "external_client_on_router*":
     approvers:
       - 10gen/server-replication-reviewers
+  - "internal_operation*":
+    approvers:
+      - 10gen/query-integration-observability
   - "server_read_concern*":
     approvers:
       - 10gen/server-rw-concerns

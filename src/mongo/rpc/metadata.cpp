@@ -22,6 +22,7 @@
 #include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
@@ -132,6 +133,13 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
             !requestArgs.getExecutionAdmissionContextType() || hasInternalAuthorization());
     ExecutionAdmissionContext::get(opCtx).setFromMetadata(
         opCtx, requestArgs.getExecutionAdmissionContextType());
+
+    if (requestArgs.getIsInternalOperation()) {
+        uassert(12313100,
+                "Client is not properly authorized to propagate isInternalOperation",
+                hasInternalAuthorization());
+        markInternalOperation(opCtx);
+    }
 
     // Typed commands which go through TypedCommand::InvocationBaseInternal will already have this
     // installed, but we keep the install check here to ensure even legacy commands can benefit from

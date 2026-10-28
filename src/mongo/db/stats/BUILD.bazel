@@ -116,6 +116,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "internal_operation",
+    srcs = [
+        "internal_operation.cpp",
+    ],
+    hdrs = [
+        "internal_operation.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "server_initiated_transaction",
     srcs = [
         "server_initiated_transaction.cpp",

@@ -7,11 +7,15 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/rpc/metadata/impersonated_client_session.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -259,6 +263,54 @@ TEST_F(InstallIfrContextFromWireTest, WireFlagValueSurvivesNestedDirectClientGet
     auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
     ASSERT_TRUE(ctx);
     ASSERT_FALSE(ctx->getSavedFlagValue(flag));
+}
+
+class ReadIsInternalOperationTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        AuthorizationManager::get(getService())->setAuthEnabled(true);
+        _opCtx = cc().makeOperationContext();
+    }
+
+    static GenericArguments argsWithIsInternalOperation() {
+        GenericArguments args;
+        args.setIsInternalOperation(true);
+        return args;
+    }
+
+    void readMetadata(const GenericArguments& args) {
+        boost::optional<ImpersonatedClientSessionGuard> clientSessionGuard;
+        readRequestMetadata(_opCtx.get(), args, false /* cmdRequiresAuth */, clientSessionGuard);
+    }
+
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(ReadIsInternalOperationTest, SetWhenPresentWithInternalAuthorization) {
+    AuthorizationSession::get(cc())->grantInternalAuthorization();
+    readMetadata(argsWithIsInternalOperation());
+    ASSERT_TRUE(isInternalOperation(_opCtx.get()));
+}
+
+TEST_F(ReadIsInternalOperationTest, UnsetWhenAbsent) {
+    AuthorizationSession::get(cc())->grantInternalAuthorization();
+    readMetadata(GenericArguments{});
+    ASSERT_FALSE(isInternalOperation(_opCtx.get()));
+}
+
+TEST_F(ReadIsInternalOperationTest, RejectedWithoutInternalAuthorization) {
+    ASSERT_THROWS_CODE(readMetadata(argsWithIsInternalOperation()), DBException, 12313100);
+    ASSERT_FALSE(isInternalOperation(_opCtx.get()));
+}
+
+TEST_F(ReadIsInternalOperationTest, DirectClientSubCommandKeepsParentStamp) {
+    // DBDirectClient runs sub-commands on the caller's opCtx, so an unstamped sub-command must not
+    // clear the parent's stamp.
+    markInternalOperation(_opCtx.get());
+    _opCtx->getClient()->setInDirectClient(true);
+    readMetadata(GenericArguments{});
+    ASSERT_TRUE(isInternalOperation(_opCtx.get()));
 }
 
 }  // namespace

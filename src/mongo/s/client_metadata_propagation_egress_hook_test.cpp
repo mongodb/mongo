@@ -8,7 +8,9 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/idl/ifr_sender_version.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version/releases.h"
 
@@ -260,6 +262,37 @@ TEST_F(ClientMetadataPropagationEgressHookTest, CachingIsIdempotent) {
     ASSERT_BSONOBJ_EQ(obj1.getField("ifrSenderVersion").wrap(),
                       obj2.getField("ifrSenderVersion").wrap());
     ASSERT_BSONOBJ_EQ(obj1.getField("ifrFlags").wrap(), obj2.getField("ifrFlags").wrap());
+}
+
+TEST_F(ClientMetadataPropagationEgressHookTest, StampedOperationAppendsIsInternalOperation) {
+    auto opCtx = makeOperationContext();
+    markInternalOperation(opCtx.get());
+
+    BSONObjBuilder bob;
+    ASSERT_OK(hook.writeRequestMetadata(opCtx.get(), &bob));
+    auto obj = bob.obj();
+    ASSERT_TRUE(obj.getBoolField(kIsInternalOperationFieldName)) << obj;
+}
+
+TEST_F(ClientMetadataPropagationEgressHookTest, UnstampedOperationOmitsIsInternalOperation) {
+    auto opCtx = makeOperationContext();
+
+    BSONObjBuilder bob;
+    ASSERT_OK(hook.writeRequestMetadata(opCtx.get(), &bob));
+    auto obj = bob.obj();
+    ASSERT_FALSE(obj.hasField(kIsInternalOperationFieldName)) << obj;
+}
+
+TEST_F(ClientMetadataPropagationEgressHookTest,
+       StampedOperationOmitsIsInternalOperationWhenFlagDisabled) {
+    unittest::ServerParameterGuard flagController("featureFlagInternalOperationOrigin", false);
+    auto opCtx = makeOperationContext();
+    markInternalOperation(opCtx.get());
+
+    BSONObjBuilder bob;
+    ASSERT_OK(hook.writeRequestMetadata(opCtx.get(), &bob));
+    auto obj = bob.obj();
+    ASSERT_FALSE(obj.hasField(kIsInternalOperationFieldName)) << obj;
 }
 
 }  // namespace
