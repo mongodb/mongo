@@ -1,1 +1,22 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
 exports_files(glob(["*.patch"]))
+
+alias(
+    name = "def_parser",
+    actual = select({
+        "//bazel/config:windows_cross_local_container_actions_enabled": "@bazel_tools//tools/def_parser:def_parser.exe",
+        "//conditions:default": "@bazel_tools//tools/def_parser:def_parser",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "windows_cross_def_parser_test",
+    srcs = ["windows_cross_def_parser_test.py"],
+    args = ["$(locations @rules_cc//cc/common:srcs)"],
+    data = [
+        "BUILD.bazel",
+        "@rules_cc//cc/common:srcs",
+    ],
+)

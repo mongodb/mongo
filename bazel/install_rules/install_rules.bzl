@@ -864,12 +864,22 @@ def mongo_install(
             srcs = [install_target + "_files", install_target + "_licenses"],
             package_dir = package_extract_name,
             package_file_name = name + install_type + ".zip",
-            exec_properties = {
-                "no-cache": "1",
-                "no-sandbox": "1",
-                "no-remote": "1",
-                "local": "1",
-            },
+            build_zip_source_only = select({
+                "//bazel/config:windows_cross_zip_source_only_enabled": True,
+                "//conditions:default": False,
+            }),
+            exec_properties = select({
+                "//bazel/config:windows_cross_zip_source_only_enabled": {
+                    "no-cache": "1",
+                    "no-remote": "1",
+                },
+                "//conditions:default": {
+                    "no-cache": "1",
+                    "no-sandbox": "1",
+                    "no-remote": "1",
+                    "local": "1",
+                },
+            }),
             exec_compatible_with = HOST_CONSTRAINTS,
             testonly = testonly,
             target_compatible_with = select({

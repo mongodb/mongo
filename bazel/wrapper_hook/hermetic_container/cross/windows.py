@@ -20,6 +20,7 @@ from bazel.toolchains.cc.mongo_windows_cross import (
 
 from .. import container_actions
 from ..bazelrc import (
+    _bazel_effective_options,
     _bazel_output_base,
     _config_requested,
     _remote_link_requested,
@@ -119,7 +120,7 @@ WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT = (
 )
 WINDOWS_CONTAINER_ACTIONS_LAYOUT_VERSION = "v1"
 WINDOWS_CROSS_UNIX_ROOT = "C:/bazel-linux"
-WINDOWS_LOCAL_CONTAINER_MNEMONICS = ("CppLink",)
+WINDOWS_LOCAL_CONTAINER_MNEMONICS = ("CppLink", "PackageZip")
 WINDOWS_CONTAINER_PREFLIGHT_TIMEOUT_SECONDS = 900
 WINDOWS_CONTAINER_RUNNER_ENVIRONMENT_KEYS = (
     "APPDATA",
@@ -692,6 +693,10 @@ def _windows_cross_host_wrapper_action_args(
             "--strategy=CargoBuildScriptRun=remote,local",
             "--strategy=CargoBuildScriptCopy=remote,local",
             "--@rules_rust//rust/settings:toolchain_linker_preference=rust",
+            "--strategy=DefParser=local",
+            "--strategy=WixCandle=local",
+            "--strategy=WixLight=local",
+            "--strategy=MsiTrim=local",
             "--strategy=WindowsRC=remote",
             "--features=-thin_archive",
             "--test_strategy=standalone",
@@ -699,9 +704,15 @@ def _windows_cross_host_wrapper_action_args(
             *_windows_cross_action_container_env_options(selection_env, containers=containers),
         ],
     )
+    # The input contract must match the final ZIP strategy, including user
+    # overrides. Keep runfiles whenever native execution remains a fallback.
+    zip_source_only = (
+        _windows_action_strategies(host_args, env=env).get("PackageZip") == "persistent-container"
+    )
     return _append_bazel_command_options_last(
         host_args,
         [
+            f"--//bazel/config:windows_cross_zip_source_only={zip_source_only}",
             # Dependency aliases must match the JVM root even when the caller supplied
             # an old repository override. Both values are owned by this execution route.
             f"--repo_env=MONGO_BAZEL_WINDOWS_UNIX_ROOT={WINDOWS_CROSS_UNIX_ROOT}",
@@ -783,10 +794,12 @@ def _windows_container_action_options(output_base: pathlib.Path) -> list[str]:
     ]
 
 
-def _windows_container_actions_requested(args: Sequence[str]) -> bool:
-    """Returns whether the planned Bazel arguments route any action to the local container."""
+def _windows_action_strategies(
+    args: Sequence[str], env: Mapping[str, str] = os.environ
+) -> dict[str, str]:
+    """Returns the effective per-mnemonic strategies before run arguments."""
     strategies: dict[str, str] = {}
-    tokens = iter(args)
+    tokens = iter(_bazel_effective_options(args, env=env, repo_root=REPO_ROOT))
     for arg in tokens:
         if arg == "--":
             break
@@ -801,6 +814,12 @@ def _windows_container_actions_requested(args: Sequence[str]) -> bool:
             mnemonic, separator, strategy = assignment.partition("=")
             if separator:
                 strategies[mnemonic] = strategy
+    return strategies
+
+
+def _windows_container_actions_requested(args: Sequence[str]) -> bool:
+    """Returns whether the planned Bazel arguments route any action to the local container."""
+    strategies = _windows_action_strategies(args)
     return any(
         "persistent-container" in strategies.get(mnemonic, "").split(",")
         for mnemonic in WINDOWS_LOCAL_CONTAINER_MNEMONICS

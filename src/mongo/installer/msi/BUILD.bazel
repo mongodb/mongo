@@ -1,5 +1,6 @@
 load("//bazel/install_rules:msi.bzl", "mongo_msi")
 load("//bazel/install_rules:msi_test.bzl", "msi_test_suite")
+load("//bazel/rules_pkg:pkg_zip_test.bzl", "pkg_zip_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +8,8 @@ msi_test_suite(
     name = "msi_windows_execution_test",
     custom_action = "//src/mongo/installer/msi/ca:mongoca",
 )
+
+pkg_zip_test_suite(name = "pkg_zip_source_inputs_test")
 
 filegroup(
     name = "install_bins",

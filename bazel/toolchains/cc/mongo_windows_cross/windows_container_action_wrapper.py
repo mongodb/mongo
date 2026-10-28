@@ -37,11 +37,12 @@ import pathlib
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[4]))
 from bazel.hermetic_container import container_paths
@@ -854,6 +855,102 @@ def _is_lld_link(tool: str) -> bool:
     }
 
 
+def _rules_pkg_repo_relative_path(tool: str) -> pathlib.PurePosixPath | None:
+    """Returns the rules_pkg path relative to the action's execroot."""
+    parts = pathlib.PurePosixPath(tool.replace("\\", "/")).parts
+    for index, part in enumerate(parts[:-1]):
+        if part == "external" and parts[index + 1].lower().startswith("rules_pkg+"):
+            return pathlib.PurePosixPath("external", *parts[index + 1 :])
+    return None
+
+
+def _is_rules_pkg_zip(tool: str) -> bool:
+    path = _rules_pkg_repo_relative_path(tool)
+    return path is not None and path.name.lower() == "build_zip.exe"
+
+
+def _rules_pkg_zip_source(tool: str) -> str:
+    path = _rules_pkg_repo_relative_path(tool)
+    if path is None or path.name.lower() != "build_zip.exe":
+        raise ValueError(f"not a rules_pkg build_zip launcher: {tool}")
+    return path.with_name("build_zip.py").as_posix()
+
+
+def _rules_pkg_zip_pythonpath(tool: str) -> str | None:
+    path = _rules_pkg_repo_relative_path(tool)
+    if path is None or path.name.lower() != "build_zip.exe":
+        return None
+    return pathlib.PurePosixPath(*path.parts[:2]).as_posix()
+
+
+def _remove_rules_pkg_zip_source(directory: pathlib.Path) -> None:
+    """Remove staged repository files, including Windows read-only cache copies."""
+
+    def retry_writable(operation: Callable[[str], object], path: str, error: Exception) -> None:
+        if not isinstance(error, PermissionError):
+            raise error
+        os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+        operation(path)
+
+    try:
+        shutil.rmtree(directory, onexc=retry_writable)
+    except OSError as exc:
+        print(f"WARNING: could not remove staged ZIP sources {directory}: {exc}", file=sys.stderr)
+
+
+def _materialize_rules_pkg_zip_source(
+    output_base: pathlib.Path,
+    scratch_root: pathlib.Path,
+    prefix: str,
+    tool: str,
+) -> tuple[str, str, pathlib.Path | None]:
+    """Copies the rules_pkg Python sources into the writable action scratch mount.
+
+    The rules_pkg launcher is a Windows executable, while the action container is Linux. Its
+    source runfiles are usually a junction into Bazel's repository cache, and passing one bind
+    mount per repository exceeds Windows' process command-line limit. Copy the small ``pkg``
+    source tree into the already-mounted scratch directory instead. The returned directory is
+    removed after the action completes.
+    """
+    relative_source = pathlib.PurePosixPath(_rules_pkg_zip_source(tool))
+    relative_pythonpath = pathlib.PurePosixPath(
+        _rules_pkg_zip_pythonpath(tool) or "external/rules_pkg+"
+    )
+    candidates = (
+        output_base.joinpath(*relative_source.parts),
+        output_base.joinpath("execroot", "_main", *relative_source.parts),
+    )
+    source: pathlib.Path | None = None
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                source = candidate.resolve(strict=True)
+                break
+        except OSError:
+            continue
+    if source is None:
+        return relative_source.as_posix(), relative_pythonpath.as_posix(), None
+
+    destination = scratch_root / f"rules-pkg-source-{uuid.uuid4().hex}"
+    try:
+        scratch_root.mkdir(parents=True, exist_ok=True)
+        repository_root = source.parents[3]
+        shutil.copytree(
+            repository_root / "pkg",
+            destination / "pkg",
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.py[cod]"),
+        )
+        container_source = _container_path(
+            destination.joinpath(*relative_source.parts[2:]), prefix
+        ).as_posix()
+        container_pythonpath = _container_path(destination, prefix).as_posix()
+    except (OSError, ValueError):
+        _remove_rules_pkg_zip_source(destination)
+        return relative_source.as_posix(), relative_pythonpath.as_posix(), None
+    return container_source, container_pythonpath, destination
+
+
 def _run_in_container(
     config: Mapping[str, object],
     config_path: pathlib.Path,
@@ -887,9 +984,17 @@ def _run_in_container(
         *_tool_command(tool),
         *tool_args,
     ]
-    env_file = _write_env_file(environment, scratch_root)
     temporary_files: list[pathlib.Path] = []
+    staged_source = None
+    if _is_rules_pkg_zip(tool):
+        source, pythonpath, staged_source = _materialize_rules_pkg_zip_source(
+            output_base, scratch_root, prefix, tool
+        )
+        environment["PYTHONPATH"] = pythonpath
+        command = ["/usr/bin/python3", source, *tool_args]
+    env_file = None
     try:
+        env_file = _write_env_file(environment, scratch_root)
         if _is_lld_link(tool):
             arguments = _materialize_rust_stdlib_archives(
                 cwd, output_base, scratch_root, prefix, tool_args, temporary_files
@@ -920,7 +1025,10 @@ def _run_in_container(
                 scratch_root / shared.ACTION_OUTPUT_LOG_DIRNAME,
             )
     finally:
-        env_file.unlink(missing_ok=True)
+        if env_file is not None:
+            env_file.unlink(missing_ok=True)
+        if staged_source is not None:
+            _remove_rules_pkg_zip_source(staged_source)
         for temporary_file in temporary_files:
             temporary_file.unlink(missing_ok=True)
 

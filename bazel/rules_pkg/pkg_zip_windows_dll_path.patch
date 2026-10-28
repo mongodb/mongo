@@ -13,6 +13,15 @@ process start and exits with STATUS_DLL_NOT_FOUND (0xC0000135) before
 main() runs. Symptom: `PackageZip dist-test-stripped.zip failed:
 (Exit -1073741515)` when Bazel packages an archive on Windows CI.
 
+The cross-action container uses the Linux Python runtime to run the rules_pkg
+source directly instead of executing the Windows launcher. Include the
+transitive Python sources in the PackageZip action inputs so `build_zip.py`
+and its `pkg.private` dependencies are present in the container execroot.
+For build_zip_source_only, pass the launcher path as a string with explicit
+launcher/source inputs so Bazel does not attach its runfiles tree or unused
+Windows virtualenv. Native execution retains the launcher runfiles. Deep
+virtualenv paths can exceed Windows sandbox symlink path limits.
+
 Fix: inject env["PATH"] = ctx.toolchains["@rules_python//python:toolchain_type"]
     .py3_runtime.interpreter.dirname on Windows. Overrides the shell PATH
 Bazel would otherwise provide; no-op on Linux/macOS
@@ -21,12 +30,29 @@ Bazel would otherwise provide; no-op on Linux/macOS
 Applied via `single_version_override(patches=...)` on rules_pkg in
 //MODULE.bazel. Candidate for upstreaming to bazelbuild/rules_pkg.
 
---- a/pkg/private/zip/zip.bzl	2026-07-14 23:02:54
-+++ b/pkg/private/zip/zip.bzl	2026-07-14 23:06:33
-@@ -65,18 +65,32 @@
- 
-     all_inputs = depset(direct = inputs, transitive = mapping_context.file_deps)
- 
+--- a/pkg/private/zip/zip.bzl
++++ b/pkg/private/zip/zip.bzl
+@@ -15 +15,3 @@
+-
++
++load("@rules_python//python:py_info.bzl", "PyInfo")
++
+@@ -66 +68,28 @@
+-    all_inputs = depset(direct = inputs, transitive = mapping_context.file_deps)
++    build_zip = ctx.executable._build_zip
++    source_deps = []
++    if ctx.attr.build_zip_source_only:
++        # The cross-container wrapper runs build_zip.py with Linux Python.
++        # A path string avoids implicitly attaching the Windows launcher's
++        # runfiles tree, whose unused venv can exceed sandbox path limits.
++        inputs.append(build_zip)
++        source_deps.append(ctx.attr._build_zip[PyInfo].transitive_sources)
++        build_zip = build_zip.path
++    all_inputs = depset(
++        direct = inputs,
++        transitive = mapping_context.file_deps + source_deps,
++    )
++
 +    _env = {
 +        "LANG": "en_US.UTF-8",
 +        "LC_CTYPE": "UTF-8",
@@ -34,24 +60,17 @@ Applied via `single_version_override(patches=...)` on rules_pkg in
 +        "PYTHONUTF8": "1",
 +    }
 +
-+    # Windows fix: rules_python 2.x py_binary launcher.exe LoadLibrary's
-+    # python313.dll at process start. use_default_shell_env below gives the
-+    # action a Bazel-curated PATH that doesn't include the Python toolchain
-+    # directory (where python313.dll lives, co-located with python.exe in
-+    # python-build-standalone). Override PATH here so the launcher finds
-+    # the DLL. No-op on Linux/macOS.
++    # Native Windows launchers need the Python toolchain directory on PATH
++    # to load python313.dll before entering main().
 +    _py = ctx.toolchains["@rules_python//python:toolchain_type"]
 +    if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
 +        _interp = _py.py3_runtime.interpreter
 +        if _interp.basename.endswith(".exe"):
 +            _env["PATH"] = _interp.dirname
-+
-     ctx.actions.run(
-         mnemonic = "PackageZip",
-         inputs = all_inputs,
-         executable = ctx.executable._build_zip,
-         arguments = [args],
-         outputs = [output_file],
+@@ -71 +100 @@
+-        executable = ctx.executable._build_zip,
++        executable = build_zip,
+@@ -74,6 +103 @@
 -        env = {
 -            "LANG": "en_US.UTF-8",
 -            "LC_CTYPE": "UTF-8",
@@ -59,14 +78,15 @@ Applied via `single_version_override(patches=...)` on rules_pkg in
 -            "PYTHONUTF8": "1",
 -        },
 +        env = _env,
-         use_default_shell_env = True,
-     )
-     return [
-@@ -88,6 +102,7 @@
- 
- pkg_zip_impl = rule(
-     implementation = _pkg_zip_impl,
+@@ -89 +113,2 @@
+-pkg_zip_impl = rule(
++pkg_zip_impl = rule(
 +    toolchains = ["@rules_python//python:toolchain_type"],
-     # @unsorted-dict-items
-     attrs = {
-         "srcs": attr.label_list(
+@@ -159 +184,6 @@
+-        "private_stamp_detect": attr.bool(default = False),
++        "private_stamp_detect": attr.bool(default = False),
++
++        "build_zip_source_only": attr.bool(
++            doc = "Declare only the ZIP launcher and Python sources. Requires a wrapper that runs the sources directly.",
++            default = False,
++        ),

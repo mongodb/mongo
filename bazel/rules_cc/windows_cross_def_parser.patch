@@ -1,0 +1,13 @@
+--- a/cc/common/semantics.bzl
++++ b/cc/common/semantics.bzl
+@@ -56,7 +56,9 @@
+     if "__DONT_DEPEND_ON_DEF_PARSER__" in tags or "def_parser" in name:
+         return None
+     else:
+-        return Label("@bazel_tools//tools/def_parser:def_parser")
++        # A Windows client using Linux execution platforms still needs the
++        # native parser; the default filegroup selects no_op.bat on Linux.
++        return Label("@@//bazel/rules_cc:def_parser")
+ 
+ def _get_def_parser():
+     return attr.label(

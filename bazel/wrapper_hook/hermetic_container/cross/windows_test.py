@@ -10,17 +10,19 @@ import platform
 import shutil
 import tempfile
 import unittest
+from collections.abc import Mapping, Sequence
 from contextlib import redirect_stdout
 from io import StringIO
 from unittest import mock
 
-from bazel.wrapper_hook.hermetic_container import config as config_module
 from bazel.wrapper_hook.hermetic_container import (
+    bazelrc,
     constants,
     container_actions,
     podman_common,
     runner,
 )
+from bazel.wrapper_hook.hermetic_container import config as config_module
 from bazel.wrapper_hook.hermetic_container import distro as distro_module
 from bazel.wrapper_hook.hermetic_container.cross import linux as cross_linux
 from bazel.wrapper_hook.hermetic_container.cross import windows as cross_windows
@@ -37,7 +39,29 @@ assert HERMETIC_CONTAINER_SPEC.loader is not None
 HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 
 
-class WindowsCrossSysrootTest(unittest.TestCase):
+class CrossPlanningTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        repo_root = pathlib.Path(directory.name)
+        original_paths = bazelrc._bazelrc_paths
+
+        def isolated_paths(
+            args: Sequence[str], env: Mapping[str, str], requested_root: pathlib.Path
+        ) -> list[pathlib.Path]:
+            # Keep explicit test RCs, but exclude the checkout's generated CI RCs
+            # and the host's system/home RCs from unit-test planning.
+            if requested_root == constants.REPO_ROOT:
+                requested_root = repo_root
+            return original_paths(["--nosystem_rc", "--nohome_rc", *args], env, requested_root)
+
+        patcher = mock.patch.object(bazelrc, "_bazelrc_paths", side_effect=isolated_paths)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class WindowsCrossExecutionTest(CrossPlanningTestCase):
     def test_default_windows_cross_image_supports_pinned_llvm_runtime(self):
         from bazel.wrapper_hook.hermetic_container.cross import windows
 
@@ -274,6 +298,9 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             )
         )
 
+
+@unittest.skipIf(os.name == "nt", "Linux cross planning requires a POSIX host")
+class LinuxCrossRbePlanningTest(CrossPlanningTestCase):
     def test_plans_linux_s390x_cross_rbe_host_args(self):
         args = cross_linux._linux_cross_rbe_host_args(
             [
@@ -1222,6 +1249,30 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             host_args.index("--strategy=CppLink=persistent-container,local"),
         )
 
+
+class WindowsCrossSysrootTest(CrossPlanningTestCase):
+    def test_explicit_native_bazelrc_keeps_windows_build_local(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            rc_path = pathlib.Path(temp_dir) / "native.bazelrc"
+            rc_path.write_text("common --remote_executor=\n", encoding="utf-8")
+            args = [f"--bazelrc={rc_path}", "build", "//target"]
+            env = {
+                "MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1",
+                "MONGO_WINDOWS_CROSS_SYSROOT_URL": "https://example.invalid/sysroot.tar.xz",
+                "MONGO_WINDOWS_CROSS_SYSROOT_SHA256": "abc",
+            }
+            with (
+                mock.patch.object(platform, "system", return_value="Windows"),
+                mock.patch.object(runner, "_prepare_windows_container_actions") as prepare,
+                mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
+            ):
+                rc = runner.run_hermetic_container("bazel", args, env)
+
+            self.assertEqual(rc, 0)
+            prepare.assert_not_called()
+            run_direct.assert_called_once()
+            self.assertIn(f"--bazelrc={rc_path}", run_direct.call_args.args[1])
+
     def test_run_hermetic_container_uses_windows_cross_host_wrapper_build(self):
         containers = {
             "amazon_linux_2023": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}
@@ -1418,7 +1469,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             self.assertNotIn("MONGO_WINDOWS_CROSS_SYSROOT_PATH", prepared)
 
 
-class WindowsPersistentContainerPlanningTest(unittest.TestCase):
+class WindowsPersistentContainerPlanningTest(CrossPlanningTestCase):
     containers = {"ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"}}
 
     def test_linux_build_tools_default_to_remote_execution(self):
@@ -1494,7 +1545,9 @@ class WindowsPersistentContainerPlanningTest(unittest.TestCase):
 
     def test_explicit_strategy_override_bypasses_container_preflight(self):
         args = cross_windows._windows_cross_host_wrapper_action_args(
-            ["build", "--strategy=CppLink=remote", "//target"], {}, self.containers
+            ["build", "--strategy=CppLink=remote", "--strategy=PackageZip=local", "//target"],
+            {},
+            self.containers,
         )
         self.assertFalse(cross_windows._windows_container_actions_requested(args))
         self.assertFalse(
@@ -1505,7 +1558,9 @@ class WindowsPersistentContainerPlanningTest(unittest.TestCase):
 
     def test_two_token_strategy_override_preserves_last_value_precedence(self):
         args = cross_windows._windows_cross_host_wrapper_action_args(
-            ["build", "--strategy", "CppLink=remote", "//target"], {}, self.containers
+            ["build", "--strategy", "CppLink=remote", "--strategy", "PackageZip=local", "//target"],
+            {},
+            self.containers,
         )
         self.assertFalse(cross_windows._windows_container_actions_requested(args))
         self.assertTrue(
@@ -1518,6 +1573,65 @@ class WindowsPersistentContainerPlanningTest(unittest.TestCase):
                 [*args, "--", "--strategy", "CppLink=persistent-container"]
             )
         )
+
+    def test_package_zip_requires_container_when_link_strategy_is_overridden(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["build", "--strategy=CppLink=remote", "//target"], {}, self.containers
+        )
+        self.assertIn("--strategy=PackageZip=persistent-container", args)
+        self.assertTrue(cross_windows._windows_container_actions_requested(args))
+
+    def test_zip_source_only_inputs_follow_the_effective_strategy(self):
+        cases = [
+            ([], True),
+            (["--config=remote_link"], False),
+            (["--strategy=PackageZip=local"], False),
+            (["--strategy", "PackageZip=local"], False),
+            (["--strategy=PackageZip=persistent-container,local"], False),
+            (["--strategy=PackageZip=local", "--strategy=PackageZip=persistent-container"], True),
+            (["--strategy=CppLink=remote"], True),
+            (["--", "--strategy=PackageZip=local"], True),
+            (
+                [
+                    "--strategy=PackageZip=local",
+                    "--//bazel/config:windows_cross_zip_source_only=True",
+                ],
+                False,
+            ),
+        ]
+        for options, source_only in cases:
+            with self.subTest(options=options):
+                args = cross_windows._windows_cross_host_wrapper_action_args(
+                    ["build", "//target", *options], {}, self.containers
+                )
+                command_args = args[: args.index("--")] if "--" in args else args
+                settings = [
+                    arg
+                    for arg in command_args
+                    if arg.startswith("--//bazel/config:windows_cross_zip_source_only=")
+                ]
+                self.assertTrue(settings)
+                self.assertEqual(
+                    settings[-1], f"--//bazel/config:windows_cross_zip_source_only={source_only}"
+                )
+
+    def test_zip_native_strategy_from_bazelrc_retains_runfiles(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bazelrc = pathlib.Path(temp_dir) / "native-zip.bazelrc"
+            bazelrc.write_text("build:native_zip --strategy=PackageZip=local\n", encoding="utf-8")
+            args = cross_windows._windows_cross_host_wrapper_action_args(
+                [
+                    f"--bazelrc={bazelrc}",
+                    "build",
+                    "--config=native_zip",
+                    "--strategy=CppLink=remote",
+                    "//target",
+                ],
+                {},
+                self.containers,
+            )
+            self.assertIn("--//bazel/config:windows_cross_zip_source_only=False", args)
+            self.assertFalse(cross_windows._windows_container_actions_requested(args))
 
     def test_repository_path_overrides_are_mounted(self):
         with tempfile.TemporaryDirectory() as temp_dir:

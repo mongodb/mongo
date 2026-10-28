@@ -7,6 +7,7 @@ import os
 import pathlib
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,17 @@ from unittest import mock
 from bazel.toolchains.cc.mongo_windows_cross import windows_container_action_wrapper as wrapper
 
 shared = wrapper.shared
+
+
+def _windows_unlink(unlink):
+    """Emulate Windows refusing to delete read-only files on any test host."""
+
+    def remove(path, *, dir_fd=None):
+        if not os.stat(path, dir_fd=dir_fd).st_mode & stat.S_IWRITE:
+            raise PermissionError("Windows cannot delete a read-only file")
+        unlink(path, dir_fd=dir_fd)
+
+    return remove
 
 
 class FakeDocker:
@@ -132,9 +144,11 @@ class FakeDocker:
 
 
 def _fake_container_path(path, prefix="/mnt"):
-    """Maps native test paths to ``/mnt/z/...`` so real files can stand in for Z:."""
-    normalized = os.fspath(path).replace("\\", "/")
-    return pathlib.PurePosixPath(prefix, "z", *pathlib.PurePosixPath(normalized).parts[1:])
+    """Maps host test paths to ``/mnt/z/...`` so real files can stand in for Z:."""
+    host_path: pathlib.PurePath = pathlib.PureWindowsPath(path)
+    if not host_path.drive:
+        host_path = pathlib.PurePosixPath(path)
+    return pathlib.PurePosixPath(prefix, "z", *host_path.parts[1:])
 
 
 class WindowsContainerActionWrapperTest(unittest.TestCase):
@@ -154,6 +168,16 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
                     _fake_container_path(path).as_posix(),
                     "/mnt/z/tmp/build with spaces/libstd.a",
                 )
+
+    def test_fake_container_path_preserves_windows_path_components(self):
+        self.assertEqual(
+            _fake_container_path(pathlib.PureWindowsPath("C:/temp/pkg/build_zip.py")).as_posix(),
+            "/mnt/z/temp/pkg/build_zip.py",
+        )
+        self.assertEqual(
+            _fake_container_path(pathlib.PurePosixPath("/temp/pkg/build_zip.py")).as_posix(),
+            "/mnt/z/temp/pkg/build_zip.py",
+        )
 
     @staticmethod
     def _config(**overrides):
@@ -487,6 +511,35 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
                 source.read_bytes(),
             )
 
+    def test_materialize_rules_pkg_zip_source_copies_the_repository_package(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            output_base = root / "output-base"
+            scratch_root = root / "sandbox" / "windows-container-runner"
+            repository = root / "repository-cache" / "rules_pkg"
+            source = repository / "pkg" / "private" / "zip" / "build_zip.py"
+            source.parent.mkdir(parents=True)
+            source.write_text("from pkg.private import manifest\n", encoding="utf-8")
+            (repository / "pkg" / "private" / "manifest.py").write_text("{}\n", encoding="utf-8")
+            (output_base / "external").mkdir(parents=True)
+            os.symlink(
+                repository, output_base / "external" / "rules_pkg+", target_is_directory=True
+            )
+
+            with mock.patch.object(wrapper, "_container_path", side_effect=_fake_container_path):
+                container_source, pythonpath, staged = wrapper._materialize_rules_pkg_zip_source(
+                    output_base,
+                    scratch_root,
+                    "/mnt",
+                    "bazel-out/windows-opt/bin/external/rules_pkg+/pkg/private/zip/build_zip.exe",
+                )
+
+            self.assertIsNotNone(staged)
+            self.assertTrue(container_source.endswith("/pkg/private/zip/build_zip.py"))
+            self.assertTrue(pythonpath.endswith(staged.name))
+            self.assertTrue((staged / "pkg" / "private" / "manifest.py").is_file())
+            shutil.rmtree(staged)
+
     def test_container_tool_and_tool_command(self):
         self.assertEqual(
             wrapper._container_tool("external\\toolchain\\wrappers\\lld-link.cmd", "/mnt"),
@@ -666,6 +719,102 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             )
             self.assertEqual(env_files, [])
             self.assertFalse(docker.commands("run"))
+
+    def test_zip_source_is_cleaned_when_environment_file_creation_fails(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir).resolve()
+            config_path, config = self._write_config(root)
+            staged = root / "staged-zip-source"
+            staged.mkdir()
+            source = staged / "build_zip.py"
+            source.write_text("", encoding="utf-8")
+            source.chmod(stat.S_IREAD)
+            sandbox_execroot = pathlib.PureWindowsPath("Z:/sandbox/execroot/_main")
+            with (
+                mock.patch.object(shared, "container_running", return_value=True),
+                mock.patch.object(pathlib.Path, "cwd", return_value=sandbox_execroot),
+                mock.patch.object(
+                    wrapper,
+                    "_materialize_rules_pkg_zip_source",
+                    return_value=("/scratch/build_zip.py", "/scratch", staged),
+                ),
+                mock.patch.object(wrapper, "_write_env_file", side_effect=OSError("disk full")),
+                mock.patch.object(os, "unlink", side_effect=_windows_unlink(os.unlink)),
+            ):
+                with self.assertRaisesRegex(OSError, "disk full"):
+                    wrapper._run_in_container(
+                        config,
+                        config_path,
+                        "external/rules_pkg+/pkg/private/zip/build_zip.exe",
+                        [],
+                    )
+            self.assertFalse(staged.exists())
+
+    def test_readonly_zip_source_is_cleaned_after_success_and_tool_failure(self):
+        for status in (0, 1):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as temp_dir:
+                root = pathlib.Path(temp_dir).resolve()
+                config_path, config = self._write_config(root)
+                staged = root / "staged-zip-source"
+                staged.mkdir()
+                source = staged / "build_zip.py"
+                source.write_text("", encoding="utf-8")
+                source.chmod(stat.S_IREAD)
+                with (
+                    mock.patch.object(shared, "container_running", return_value=True),
+                    mock.patch.object(
+                        pathlib.Path,
+                        "cwd",
+                        return_value=pathlib.PureWindowsPath("Z:/sandbox/execroot/_main"),
+                    ),
+                    mock.patch.object(
+                        wrapper,
+                        "_materialize_rules_pkg_zip_source",
+                        return_value=("/scratch/build_zip.py", "/scratch", staged),
+                    ),
+                    mock.patch.object(
+                        shared, "run_container_command", return_value=(status, "", [])
+                    ),
+                    mock.patch.object(os, "unlink", side_effect=_windows_unlink(os.unlink)),
+                ):
+                    self.assertEqual(
+                        wrapper._run_in_container(
+                            config,
+                            config_path,
+                            "external/rules_pkg+/pkg/private/zip/build_zip.exe",
+                            [],
+                        ),
+                        status,
+                    )
+                self.assertFalse(staged.exists())
+
+    def test_readonly_partial_zip_source_is_cleaned_after_copy_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            source = root / "output-base/external/rules_pkg+/pkg/private/zip/build_zip.py"
+            source.parent.mkdir(parents=True)
+            source.write_text("", encoding="utf-8")
+            scratch = root / "scratch"
+
+            def fail_copy(src, dst, **kwargs):
+                pathlib.Path(dst).mkdir(parents=True)
+                partial = pathlib.Path(dst) / "build_zip.py"
+                partial.write_text("", encoding="utf-8")
+                partial.chmod(stat.S_IREAD)
+                raise OSError("disk full")
+
+            with (
+                mock.patch.object(shutil, "copytree", side_effect=fail_copy),
+                mock.patch.object(os, "unlink", side_effect=_windows_unlink(os.unlink)),
+            ):
+                _, _, staged = wrapper._materialize_rules_pkg_zip_source(
+                    root / "output-base",
+                    scratch,
+                    "/mnt",
+                    "external/rules_pkg+/pkg/private/zip/build_zip.exe",
+                )
+            self.assertIsNone(staged)
+            self.assertEqual(list(scratch.glob("rules-pkg-source-*")), [])
 
     @unittest.skipIf(os.name == "nt", "Process-backed supervision needs POSIX shells")
     def test_supervisor_cleans_action_scratch_after_completion_cancellation_and_lease_expiry(self):
@@ -923,7 +1072,7 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             host_bin = pathlib.Path(temp_dir) / "Program Files" / "Docker"
             host_bin.mkdir(parents=True)
-            docker = host_bin / ("docker.exe" if os.name == "nt" else "docker")
+            docker = host_bin / ("docker.EXE" if os.name == "nt" else "docker")
             docker.write_text("#!/bin/sh\n", encoding="utf-8")
             docker.chmod(0o755)
 

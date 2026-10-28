@@ -1140,6 +1140,18 @@ config_setting(
     },
 )
 
+bool_flag(
+    name = "windows_cross_zip_source_only",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "windows_cross_zip_source_only_enabled",
+    flag_values = {
+        "//bazel/config:windows_cross_zip_source_only": "True",
+    },
+)
+
 string_flag(
     name = "windows_cross_host_path",
     build_setting_default = "",

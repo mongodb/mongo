@@ -78,7 +78,10 @@ bazel_dep(name = "rules_cc", version = "0.2.18")
 single_version_override(
     module_name = "rules_cc",
     patch_strip = 1,
-    patches = ["//bazel/rules_cc:link_memory.patch"],
+    patches = [
+        "//bazel/rules_cc:link_memory.patch",
+        "//bazel/rules_cc:windows_cross_def_parser.patch",
+    ],
     version = "0.2.18",
 )
 
