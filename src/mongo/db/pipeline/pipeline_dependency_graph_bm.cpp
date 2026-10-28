@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_optimization_bm_fixture.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/util/str.h"
 
 #include <cstddef>
 #include <iterator>
@@ -200,6 +201,133 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDepend
 BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDependencyGraphRenames)
     ->ArgNames({"stages", "typeInference"})
     ->ArgsProduct({{10, 100, 1000} /*stages*/, {0, 1} /*typeInference*/})
+    ->Unit(benchmark::kMicrosecond);
+
+/// Returns a dotted path of 'depth' components, e.g. 'x.p1.p2' for depth 3.
+std::string makeDottedPath(size_t depth) {
+    str::stream path;
+    path << "x";
+    for (size_t i = 1; i < depth; ++i) {
+        path << ".p" << i;
+    }
+    return path;
+}
+
+// Report the cost of canPathBeArray() for a pipeline with a single $match that proves that no
+// component in a long dotted path can contain arrays. For example:
+// {$match: {
+//   x: {$not: {$type: 'array'}},
+//   'x.p1': {$not: {$type: 'array'}},
+//   'x.p1.2': {$not: {$type: 'array'}},
+//   ...,
+//   'x.p1.p2...pN': {$not: {$type: 'array'}}
+// }}
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArrayDottedPath)
+(benchmark::State& state) {
+    const auto path = makeDottedPath(state.range(0));
+    BSONObjBuilder predicates;
+    for (size_t depth = 1; depth <= static_cast<size_t>(state.range(0)); ++depth) {
+        predicates.append(makeDottedPath(depth), fromjson("{$not: {$type: 'array'}}"));
+    }
+    auto pipeline = pipeline_factory::makePipeline(
+        {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, path));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArrayDottedPath)
+    ->ArgNames({"depth", "typeInference"})
+    ->ArgsProduct({{1, 4, 16} /*depth*/, {0, 1} /*typeInference*/})
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of canPathBeArray() for a pipeline with a single $match that proves that 'x'
+// cannot be an array and also constrains the types of many unrelated fields. For example:
+// {$match: {
+//   x: {$not: {$type: 'array'}},
+//   u0: {$type: 'number'},
+//   u1: {$type: 'number'},
+//   ...,
+//   uN: {$type: 'number'}
+// }}
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture,
+                   BM_CanPathBeArrayUnrelatedPredicates)
+(benchmark::State& state) {
+    BSONObjBuilder predicates;
+    predicates.append("x", fromjson("{$not: {$type: 'array'}}"));
+    for (int64_t i = 0; i < state.range(0); ++i) {
+        predicates.append(fmt::format("u{}", i), fromjson("{$type: 'number'}"));
+    }
+    auto pipeline = pipeline_factory::makePipeline(
+        {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture,
+                     BM_CanPathBeArrayUnrelatedPredicates)
+    ->ArgNames({"predicates", "typeInference"})
+    ->ArgsProduct({{0, 10, 100, 1000} /*predicates*/, {0, 1} /*typeInference*/})
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of canPathBeArray() for a pipeline with a single $match that proves that 'x'
+// cannot be an array and also constrains the types of many unrelated subpaths of 'x'. For example:
+// {$match: {
+//   x: {$not: {$type: 'array'}},
+//   'x.u0': {$type: 'number'},
+//   'x.u1': {$type: 'number'},
+//   ...,
+//   'x.uN': {$type: 'number'}
+// }}
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture,
+                   BM_CanPathBeArrayUnrelatedSubpathPredicates)
+(benchmark::State& state) {
+    BSONObjBuilder predicates;
+    predicates.append("x", fromjson("{$not: {$type: 'array'}}"));
+    for (int64_t i = 0; i < state.range(0); ++i) {
+        predicates.append(fmt::format("x.u{}", i), fromjson("{$type: 'number'}"));
+    }
+    auto pipeline = pipeline_factory::makePipeline(
+        {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture,
+                     BM_CanPathBeArrayUnrelatedSubpathPredicates)
+    ->ArgNames({"predicates", "typeInference"})
+    ->ArgsProduct({{0, 10, 100, 1000} /*predicates*/, {0, 1} /*typeInference*/})
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of canPathBeArray() for a pipeline with a $match that proves that 'x' cannot be
+// an array, followed by many $match stages that constrain unrelated fields. For example:
+// [
+//   {$match: {x: {$not: {$type: 'array'}}}},
+//   {$match: {u0: {$type: 'number'}}},
+//   {$match: {u1: {$type: 'number'}}},
+//   ...,
+//   {$match: {uN: {$type: 'number'}}}
+// ]
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArrayUnrelatedMatches)
+(benchmark::State& state) {
+    std::vector<BSONObj> rawPipeline{fromjson("{$match: {x: {$not: {$type: 'array'}}}}")};
+    for (int64_t i = 0; i < state.range(0); ++i) {
+        rawPipeline.push_back(
+            BSON("$match" << BSON(fmt::format("u{}", i) << BSON("$type" << "number"))));
+    }
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture,
+                     BM_CanPathBeArrayUnrelatedMatches)
+    ->ArgNames({"matches", "typeInference"})
+    ->ArgsProduct({{0, 10, 100, 999} /*matches*/, {0, 1} /*typeInference*/})
     ->Unit(benchmark::kMicrosecond);
 
 }  // namespace
