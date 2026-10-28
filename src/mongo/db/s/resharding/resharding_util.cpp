@@ -43,6 +43,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/otel/telemetry_context_holder.h"
@@ -972,6 +973,7 @@ CancelableOperationContext makeReshardingOperationContext(
     bool nonDeprioritizable,
     const boost::optional<ForwardableOperationMetadata>& fom) {
     return factory.makeOperationContext(&cc(), [nonDeprioritizable, fom](OperationContext* opCtx) {
+        markInternalOperation(opCtx);
         if (nonDeprioritizable) {
             ExecutionAdmissionContext::get(opCtx).setTaskType(
                 opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);

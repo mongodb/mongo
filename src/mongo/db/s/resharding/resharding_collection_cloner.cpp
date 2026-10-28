@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -416,6 +417,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                [this, chainCtx, factory, executor, cleanupExecutor, cancelToken] {
                    reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
                    auto opCtx = factory->makeOperationContext(&cc());
+                   markInternalOperation(opCtx.get());
                    _runOnceWithNaturalOrder(opCtx.get(),
                                             MongoProcessInterface::create(opCtx.get()),
                                             executor,
