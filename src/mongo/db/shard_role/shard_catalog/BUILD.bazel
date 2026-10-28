@@ -54,6 +54,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "foreign_key_constraint_gen",
+    src = "foreign_key_constraint.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "collection_options",
     srcs = [
@@ -62,6 +70,7 @@ mongo_cc_library(
         "collection_options.cpp",
         "collection_options_gen",
         "collection_options_validation.cpp",
+        "foreign_key_constraint_gen",
     ],
     deps = [
         "//src/mongo/crypto:encrypted_field_config",

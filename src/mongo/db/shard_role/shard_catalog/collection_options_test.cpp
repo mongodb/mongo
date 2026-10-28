@@ -17,6 +17,7 @@
 
 #include <limits>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -1234,6 +1235,195 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                 }
             ]
         }})")));
+}
+
+namespace {
+ForeignKeyConstraint makeForeignKeyConstraint() {
+    return ForeignKeyConstraint(
+        "fk_parent",
+        {"parentId", "tenantId"},
+        ForeignKeyConstraintReferences(
+            assertGet(UUID::parse("00000000-0000-0000-0000-000000000001")), {"_id", "tenantId"}),
+        ForeignKeyConstraintStateEnum::kUnvalidated,
+        false);
+}
+}  // namespace
+
+TEST(CollectionOptions, ForeignKeyConstraintsRoundTrip) {
+    CollectionOptions options;
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+    // Use distinct values to detect duplicated entries and exercise both states and deferrable
+    // values.
+    auto& deferred = options.foreignKeyConstraints.back();
+    deferred.setName("fk_deferred");
+    deferred.setFields(std::vector<std::string>{"otherParentId"});
+    deferred.setReferences(ForeignKeyConstraintReferences(
+        assertGet(UUID::parse("00000000-0000-0000-0000-000000000002")), {"_id"}));
+    deferred.setState(ForeignKeyConstraintStateEnum::kValidated);
+    deferred.setDeferrable(true);
+
+    const auto serialized = options.toBSON();
+    const auto constraints = serialized["foreignKeyConstraints"].Array();
+    ASSERT_EQ(constraints.size(), 2U);
+    ASSERT_BSONOBJ_EQ(constraints[0].Obj(), fromjson(R"({
+        name: "fk_parent",
+        fields: ["parentId", "tenantId"],
+        references: {
+            parentCollection: {$uuid: "00000000-0000-0000-0000-000000000001"},
+            parentFields: ["_id", "tenantId"]
+        },
+        state: "unvalidated",
+        deferrable: false
+    })"));
+    const auto parsed =
+        assertGet(CollectionOptions::parse(serialized, CollectionOptions::parseForStorage));
+    // IDL generated equality compares all fields in both constraints.
+    ASSERT_TRUE(parsed.foreignKeyConstraints == options.foreignKeyConstraints);
+    ASSERT_BSONOBJ_EQ(parsed.toBSON(), serialized);
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsEmptyStorageOptions) {
+    const auto absent =
+        assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForStorage));
+    const auto empty = assertGet(CollectionOptions::parse(fromjson("{foreignKeyConstraints: []}"),
+                                                          CollectionOptions::parseForStorage));
+    ASSERT_TRUE(empty.foreignKeyConstraints.empty());
+    ASSERT_BSONOBJ_EQ(empty.toBSON(), absent.toBSON());
+    ASSERT_TRUE(empty.matchesStorageOptions(absent, nullptr));
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsRejectedForCommand) {
+    const auto constraints = BSON_ARRAY(makeForeignKeyConstraint().toBSON());
+    for (const auto& options : {BSON("foreignKeyConstraints" << constraints),
+                                BSON("create" << 1 << "foreignKeyConstraints" << constraints)}) {
+        ASSERT_EQ(CollectionOptions::parse(options, CollectionOptions::parseForCommand)
+                      .getStatus()
+                      .code(),
+                  ErrorCodes::InvalidOptions);
+    }
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsFieldSelection) {
+    CollectionOptions options;
+    options.uuid = assertGet(UUID::parse("00000000-0000-0000-0000-000000000003"));
+    options.capped = true;
+    options.cappedSize = 4096;
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+
+    ASSERT_BSONOBJ_EQ(
+        options.toBSON(false, {"foreignKeyConstraints"}),
+        BSON("foreignKeyConstraints" << BSON_ARRAY(makeForeignKeyConstraint().toBSON())));
+    ASSERT_FALSE(options.toBSON(false, {"capped"}).hasField("foreignKeyConstraints"));
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsRejectMalformedStorageOptions) {
+    for (const auto& options : {fromjson("{foreignKeyConstraints: {}}"),
+                                fromjson("{foreignKeyConstraints: [1]}"),
+                                fromjson("{foreignKeyConstraints: [[]]}"),
+                                fromjson("{foreignKeyConstraints: [{}]}")}) {
+        ASSERT_NOT_OK(
+            CollectionOptions::parse(options, CollectionOptions::parseForStorage).getStatus());
+    }
+
+    const auto valid = makeForeignKeyConstraint().toBSON();
+    for (const auto* fieldName : {"name", "fields", "references", "state", "deferrable"}) {
+        ASSERT_NOT_OK(CollectionOptions::parse(
+                          BSON("foreignKeyConstraints" << BSON_ARRAY(valid.removeField(fieldName))),
+                          CollectionOptions::parseForStorage)
+                          .getStatus());
+    }
+
+    for (const auto& invalid :
+         {fromjson("{name: 1}"),
+          fromjson("{fields: 'parentId'}"),
+          fromjson("{fields: [1]}"),
+          fromjson("{references: {parentFields: ['_id']}}"),
+          fromjson("{references: {parentCollection: 'not-a-uuid', parentFields: ['_id']}}"),
+          fromjson("{onDelete: 'noAction'}"),
+          fromjson("{onUpdate: 'noAction'}"),
+          fromjson("{state: 'ready'}"),
+          fromjson("{deferrable: 'true'}"),
+          fromjson("{unknown: true}")}) {
+        BSONObjBuilder constraintBuilder;
+        constraintBuilder.appendElements(valid.removeField(invalid.firstElementFieldName()));
+        constraintBuilder.appendElements(invalid);
+        ASSERT_NOT_OK(CollectionOptions::parse(
+                          BSON("foreignKeyConstraints" << BSON_ARRAY(constraintBuilder.obj())),
+                          CollectionOptions::parseForStorage)
+                          .getStatus());
+    }
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsRejectUnpairedFields) {
+    using Fields = std::vector<std::string>;
+    for (const auto& [fields, parentFields] : {std::pair{Fields{}, Fields{}},
+                                               {Fields{}, Fields{"_id"}},
+                                               {Fields{"parentId"}, Fields{}},
+                                               {Fields{"parentId", "tenantId"}, Fields{"_id"}},
+                                               {Fields{"parentId"}, Fields{"_id", "tenantId"}}}) {
+        CollectionOptions options;
+        options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+        auto& constraint = options.foreignKeyConstraints.back();
+        constraint.setFields(fields);
+        constraint.getReferences().setParentFields(parentFields);
+        ASSERT_EQ(CollectionOptions::parse(options.toBSON(), CollectionOptions::parseForStorage)
+                      .getStatus()
+                      .code(),
+                  ErrorCodes::BadValue);
+    }
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsRejectNullishFieldEntries) {
+    const auto valid = makeForeignKeyConstraint().toBSON();
+    const auto references = valid["references"].Obj();
+    for (const auto& [fields, parentFields] :
+         {std::pair{BSON_ARRAY(BSONNULL), BSON_ARRAY("_id")},
+          {BSON_ARRAY("parentId"), BSON_ARRAY(BSONUndefined)},
+          // Skipping the nulls would leave an undeclared 'parentId' -> '_id' pair.
+          {BSON_ARRAY("parentId" << BSONNULL), BSON_ARRAY(BSONNULL << "_id")}}) {
+        const auto constraint = valid.addFields(
+            BSON("fields" << fields << "references"
+                          << references.addFields(BSON("parentFields" << parentFields))));
+        ASSERT_EQ(CollectionOptions::parse(BSON("foreignKeyConstraints" << BSON_ARRAY(constraint)),
+                                           CollectionOptions::parseForStorage)
+                      .getStatus()
+                      .code(),
+                  ErrorCodes::BadValue)
+            << constraint;
+    }
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsMatchesStorageOptions) {
+    CollectionOptions options;
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+    auto other = options;
+    ASSERT_TRUE(options.matchesStorageOptions(other, nullptr));
+
+    other.foreignKeyConstraints.front().setState(ForeignKeyConstraintStateEnum::kValidated);
+    ASSERT_FALSE(options.matchesStorageOptions(other, nullptr));
+
+    other = options;
+    other.foreignKeyConstraints.front().setReferences(ForeignKeyConstraintReferences(
+        assertGet(UUID::parse("00000000-0000-0000-0000-000000000002")), {"_id", "tenantId"}));
+    ASSERT_FALSE(options.matchesStorageOptions(other, nullptr));
+
+    other = options;
+    other.foreignKeyConstraints.front().setFields(std::vector<std::string>{"tenantId", "parentId"});
+    ASSERT_FALSE(options.matchesStorageOptions(other, nullptr));
+
+    other.foreignKeyConstraints.clear();
+    ASSERT_FALSE(options.matchesStorageOptions(other, nullptr));
+}
+
+TEST(CollectionOptions, ForeignKeyConstraintsMatchesStorageOptionsIgnoresConstraintOrder) {
+    CollectionOptions options;
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+    options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
+    options.foreignKeyConstraints.back().setName("fk_other");
+    auto other = options;
+    std::swap(other.foreignKeyConstraints.front(), other.foreignKeyConstraints.back());
+    ASSERT_TRUE(options.matchesStorageOptions(other, nullptr));
 }
 
 }  // namespace mongo

@@ -12,6 +12,7 @@
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/foreign_key_constraint_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -19,6 +20,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -36,9 +38,8 @@ struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
     bool isView() const;
 
     /**
-     * The 'uuid' member is a collection property stored in the catalog with user-settable options,
-     * but is not valid for the user to specify as collection option. So, parsing commands must
-     * reject the 'uuid' property, but parsing stored options must accept it.
+     * Parsing stored options accepts the collection UUID and resolved foreign-key constraints;
+     * parsing command options rejects these catalog representations.
      */
     enum ParseKind { parseForCommand, parseForStorage };
 
@@ -50,8 +51,8 @@ struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
     /**
      * Parses the collection 'options' into the appropriate struct fields.
      *
-     * When 'kind' is set to ParseKind::parseForStorage, the 'uuid' field is parsed,
-     * otherwise the 'uuid' field is not parsed.
+     * With ParseKind::parseForStorage, 'uuid' and resolved 'foreignKeyConstraints' metadata are
+     * parsed; parseForCommand rejects these catalog representations.
      *
      * When 'kind' is set to ParseKind::parseForCommand, the 'idIndex' field is parsed,
      * otherwise the 'idIndex' field is not parsed.
@@ -78,7 +79,8 @@ struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
     BSONObj toBSON(bool includeUUID = true, const StringDataSet& includeFields = {}) const;
 
     /**
-     * Returns true if given options matches to this.
+     * Returns true if the options match, ignoring foreign-key constraint order but preserving
+     * field-pair order.
      *
      * Uses the collatorFactory to normalize the collation property being compared.
      *
@@ -150,6 +152,10 @@ struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
 
     // The options for collections with encrypted fields
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
+
+    // Foreign-key constraints declared by this child collection, with referenced parents resolved
+    // to collection UUIDs.
+    std::vector<ForeignKeyConstraint> foreignKeyConstraints;
 };
 
 [[MONGO_MOD_PRIVATE]]

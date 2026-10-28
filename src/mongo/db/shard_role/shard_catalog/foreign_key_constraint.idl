@@ -1,0 +1,51 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+    mod_visibility: public
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    ForeignKeyConstraintState:
+        description: "Whether existing documents have been validated against the constraint."
+        type: string
+        values:
+            kUnvalidated: unvalidated
+            kValidated: validated
+
+structs:
+    ForeignKeyConstraintReferences:
+        description: "The parent collection and fields referenced by a foreign-key constraint."
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            parentCollection:
+                description: "UUID of the referenced parent collection."
+                type: uuid
+            parentFields:
+                description: "Non-empty parent field paths, positionally paired with the equally sized child fields."
+                type: array<string>
+
+    ForeignKeyConstraint:
+        description: "A foreign-key constraint stored in the child collection's catalog options."
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            name:
+                description: "Constraint name within the child collection."
+                type: string
+            fields:
+                description: "Non-empty child field paths, positionally paired with the equally sized references.parentFields."
+                type: array<string>
+            references:
+                description: "The parent collection and fields referenced by this constraint."
+                type: ForeignKeyConstraintReferences
+            state:
+                description: "Validation state of this constraint."
+                type: ForeignKeyConstraintState
+            deferrable:
+                description: "Whether constraint checks may be deferred until transaction commit."
+                type: bool

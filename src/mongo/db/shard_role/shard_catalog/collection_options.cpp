@@ -23,6 +23,7 @@
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <string_view>
@@ -101,6 +102,7 @@ Status CollectionOptions::validateForStorage() const {
 }
 
 static constexpr auto kAutoIndexIdFieldName = "autoIndexId"sv;
+static constexpr auto kForeignKeyConstraintsFieldName = "foreignKeyConstraints"sv;
 
 StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
     CollectionOptions collectionOptions;
@@ -300,6 +302,49 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             try {
                 collectionOptions.encryptedFieldConfig = EncryptedFieldConfig::parse(
                     e.Obj(), IDLParserContext{"CollectionOptions::parse"});
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        } else if (fieldName == kForeignKeyConstraintsFieldName) {
+            if (kind != parseForStorage) {
+                return {ErrorCodes::InvalidOptions,
+                        "Resolved 'foreignKeyConstraints' metadata cannot be supplied as a command "
+                        "option"};
+            }
+            if (e.type() != BSONType::array) {
+                return {ErrorCodes::TypeMismatch, "'foreignKeyConstraints' must be an array"};
+            }
+
+            try {
+                for (const auto& constraint : BSONArray(e.Obj())) {
+                    if (constraint.type() != BSONType::object) {
+                        return {ErrorCodes::TypeMismatch,
+                                "Each 'foreignKeyConstraints' entry must be a document"};
+                    }
+                    const auto constraintObj = constraint.Obj();
+                    auto parsedConstraint = ForeignKeyConstraint::parse(
+                        constraintObj, IDLParserContext{"CollectionOptions::parse"});
+                    // The IDL parser skips null and undefined array entries; require strings so
+                    // these BSON counts match the parsed arrays without allocating through the IDL
+                    // getters.
+                    const auto isStringArray = [](const BSONObj& arr) {
+                        return std::all_of(arr.begin(), arr.end(), [](const BSONElement& elem) {
+                            return elem.type() == BSONType::string;
+                        });
+                    };
+                    const auto fields = constraintObj[ForeignKeyConstraint::kFieldsFieldName].Obj();
+                    const auto parentFields =
+                        constraintObj[ForeignKeyConstraint::kReferencesFieldName]
+                                     [ForeignKeyConstraintReferences::kParentFieldsFieldName]
+                                         .Obj();
+                    if (fields.isEmpty() || fields.nFields() != parentFields.nFields() ||
+                        !isStringArray(fields) || !isStringArray(parentFields)) {
+                        return {ErrorCodes::BadValue,
+                                "'fields' and 'references.parentFields' must be non-empty string "
+                                "arrays of the same length"};
+                    }
+                    collectionOptions.foreignKeyConstraints.push_back(std::move(parsedConstraint));
+                }
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -525,6 +570,15 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
     if (encryptedFieldConfig && shouldAppend(CreateCommand::kEncryptedFieldsFieldName)) {
         builder->append(CreateCommand::kEncryptedFieldsFieldName, encryptedFieldConfig->toBSON());
     }
+
+    if (!foreignKeyConstraints.empty() && shouldAppend(kForeignKeyConstraintsFieldName)) {
+        BSONArrayBuilder constraintsBuilder(
+            builder->subarrayStart(kForeignKeyConstraintsFieldName));
+        for (const auto& constraint : foreignKeyConstraints) {
+            BSONObjBuilder constraintBuilder(constraintsBuilder.subobjStart());
+            constraint.serialize(&constraintBuilder);
+        }
+    }
 }
 
 bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
@@ -619,7 +673,11 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
         return false;
     }
 
-    return true;
+    // O(n^2) comparison avoids copies, expected to be small.
+    return std::is_permutation(foreignKeyConstraints.begin(),
+                               foreignKeyConstraints.end(),
+                               other.foreignKeyConstraints.begin(),
+                               other.foreignKeyConstraints.end());
 }
 
 namespace {
