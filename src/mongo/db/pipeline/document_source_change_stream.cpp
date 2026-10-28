@@ -183,6 +183,129 @@ void incrementScopeMetric(ChangeStreamType type) {
     }
 }
 
+// Whether the user explicitly provided each resume option. These must be read before 'spec' is
+// mutated (auto-setting startAtOperationTime for new streams, or replacing startAfter with
+// resumeAfter for HWM tokens), otherwise server-injected values would be counted as user intent.
+struct UserProvidedResumeOptions {
+    explicit UserProvidedResumeOptions(const DocumentSourceChangeStreamSpec& spec)
+        : resumeAfter(spec.getResumeAfter().has_value()),
+          startAfter(spec.getStartAfter().has_value()),
+          startAtOperationTime(spec.getStartAtOperationTime().has_value()) {}
+
+    bool resumeAfter;
+    bool startAfter;
+    bool startAtOperationTime;
+};
+
+// If the user did not specify an explicit starting point, sets it to the current time, then adopts
+// the higher of the stream's default token version and the client's token version. Returns the
+// resume token resolved from the resulting spec.
+ResumeTokenData initializeResumeState(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      DocumentSourceChangeStreamSpec& spec) {
+    // If the user did not specify an explicit starting point, set it to the current time.
+    if (!spec.getResumeAfter() && !spec.getStartAfter() && !spec.getStartAtOperationTime()) {
+        // Make sure we update the 'startAtOperationTime' in the 'spec' so that we serialize the
+        // correct start point when sending it to the shards.
+        spec.setStartAtOperationTime(DocumentSourceChangeStream::getStartTimeForNewStream(expCtx));
+    }
+
+    // If the stream's default version differs from the client's token version, adopt the higher.
+    // This is the token version that will be used once the stream has passed the resume token.
+    const auto clientToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+    expCtx->setChangeStreamTokenVersion(
+        std::max(expCtx->getChangeStreamTokenVersion(), clientToken.version));
+
+    // If the user explicitly requested to resume from a high water mark token, but its version
+    // differs from the version chosen above, regenerate it with the new version. There is no need
+    // for a resumed HWM stream to adopt the old token version for events at the same clusterTime.
+    const bool tokenVersionsDiffer = (clientToken.version != expCtx->getChangeStreamTokenVersion());
+    const bool isHighWaterMark = ResumeToken::isHighWaterMarkToken(clientToken);
+    if (isHighWaterMark && tokenVersionsDiffer && (spec.getResumeAfter() || spec.getStartAfter())) {
+        spec.setResumeAfter(ResumeToken(ResumeToken::makeHighWaterMarkToken(
+            clientToken.clusterTime, expCtx->getChangeStreamTokenVersion())));
+        spec.setStartAfter(boost::none);
+    }
+
+    // Obtain the resume token from the spec. This will be used when building the pipeline.
+    return change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+}
+
+// Configures the V2 change stream reader: records v2 shard targeting on CurOp and populates the
+// supported control events for 'DocumentSourceChangeStreamTransform'.
+void configureV2Reader(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       const ChangeStream& changeStream,
+                       DocumentSourceChangeStreamSpec& spec) {
+    OperationContext* opCtx = expCtx->getOperationContext();
+
+    // Record on CurOp so it rides onto the ClusterClientCursor at registration (mirroring
+    // isChangeStreamQuery). The router getMore precondition uses this to kill-and-resume the
+    // cursor on the v1 path if the IFR flag is later turned off.
+    CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting = true;
+
+    ChangeStreamReaderBuilder* readerBuilder =
+        ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
+    tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
+
+    // Set supported control events for the 'DocumentSourceChangeStreamTransform' stage. That stage
+    // will pick up the supported events from the change stream definition in the ExpressionContext
+    // later.
+    auto controlEventTypes = readerBuilder->getControlEventTypesOnDataShard(opCtx, changeStream);
+
+    spec.setSupportedEvents(
+        std::vector<std::string>(std::make_move_iterator(controlEventTypes.begin()),
+                                 std::make_move_iterator(controlEventTypes.end())));
+}
+
+// Increments the per-option change stream feature counters exactly once per query, and only during
+// actual execution, not query shape parsing.
+void incrementChangeStreamFeatureMetrics(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const DocumentSourceChangeStreamSpec& spec,
+                                         const ChangeStream& changeStream,
+                                         const UserProvidedResumeOptions& userOptions) {
+    if (!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() ||
+        !expCtx->updateChangeStreamFeatureCounters()) {
+        return;
+    }
+
+    if (spec.getShowExpandedEvents().value_or(false)) {
+        csOptShowExpandedEvents.add(1);
+    }
+    if (spec.getShowMigrationEvents().value_or(false)) {
+        csOptShowMigrationEvents.add(1);
+    }
+    if (spec.getShowSystemEvents().value_or(false)) {
+        csOptShowSystemEvents.add(1);
+    }
+    if (spec.getShowRawUpdateDescription().value_or(false)) {
+        csOptShowRawUpdateDescription.add(1);
+    }
+    if (spec.getIgnoreRemovedShards().value_or(false)) {
+        csOptIgnoreRemovedShards.add(1);
+    }
+    if (spec.getMatchCollectionUUIDForUpdateLookup().value_or(false)) {
+        csOptMatchCollectionUUIDForUpdateLookup.add(1);
+    }
+
+    if (userOptions.resumeAfter) {
+        csOptResumeAfter.add(1);
+    }
+    if (userOptions.startAfter) {
+        csOptStartAfter.add(1);
+    }
+    if (userOptions.startAtOperationTime) {
+        csOptStartAtOperationTime.add(1);
+    }
+
+    incrementFullDocumentMetric(spec.getFullDocument());
+    incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
+    incrementShowEndOfTransactionMetric(
+        spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff));
+    incrementScopeMetric(changeStream.getChangeStreamType());
+
+    // Prevent updating the feature counters again for the same query.
+    expCtx->setUpdateChangeStreamFeatureCounters(false);
+}
+
 }  // namespace
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(changeStream,
@@ -399,41 +522,11 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
 
-    // Capture whether the user explicitly provided each resume option. These booleans must be
-    // captured here — before the blocks below that mutate 'spec' (auto-setting
-    // startAtOperationTime for new streams, or replacing startAfter with resumeAfter for HWM
-    // tokens). Reading from 'spec' directly at the metric increment site would count
-    // server-injected values, not user intent.
-    const bool userSetResumeAfter = spec.getResumeAfter().has_value();
-    const bool userSetStartAfter = spec.getStartAfter().has_value();
-    const bool userSetStartAtOperationTime = spec.getStartAtOperationTime().has_value();
+    // Capture whether the user explicitly provided each resume option before 'spec' is mutated.
+    const UserProvidedResumeOptions userOptions(spec);
 
-    // If the user did not specify an explicit starting point, set it to the current time.
-    if (!spec.getResumeAfter() && !spec.getStartAfter() && !spec.getStartAtOperationTime()) {
-        // Make sure we update the 'startAtOperationTime' in the 'spec' so that we serialize the
-        // correct start point when sending it to the shards.
-        spec.setStartAtOperationTime(DocumentSourceChangeStream::getStartTimeForNewStream(expCtx));
-    }
-
-    // If the stream's default version differs from the client's token version, adopt the higher.
-    // This is the token version that will be used once the stream has passed the resume token.
-    const auto clientToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
-    expCtx->setChangeStreamTokenVersion(
-        std::max(expCtx->getChangeStreamTokenVersion(), clientToken.version));
-
-    // If the user explicitly requested to resume from a high water mark token, but its version
-    // differs from the version chosen above, regenerate it with the new version. There is no need
-    // for a resumed HWM stream to adopt the old token version for events at the same clusterTime.
-    const bool tokenVersionsDiffer = (clientToken.version != expCtx->getChangeStreamTokenVersion());
-    const bool isHighWaterMark = ResumeToken::isHighWaterMarkToken(clientToken);
-    if (isHighWaterMark && tokenVersionsDiffer && (spec.getResumeAfter() || spec.getStartAfter())) {
-        spec.setResumeAfter(ResumeToken(ResumeToken::makeHighWaterMarkToken(
-            clientToken.clusterTime, expCtx->getChangeStreamTokenVersion())));
-        spec.setStartAfter(boost::none);
-    }
-
-    // Obtain the resume token from the spec. This will be used when building the pipeline.
-    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+    // Auto-set a start point for new streams and adopt the resume token's version.
+    auto resumeToken = initializeResumeState(expCtx, spec);
 
     const auto& nss = expCtx->getNamespaceString();
 
@@ -449,63 +542,13 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     spec.setVersion(changeStreamVersion);
 
     if (changeStreamVersion == ChangeStreamReaderVersionEnum::kV2) {
-        OperationContext* opCtx = expCtx->getOperationContext();
-
-        // Record on CurOp so it rides onto the ClusterClientCursor at registration (mirroring
-        // isChangeStreamQuery). The router getMore precondition uses this to kill-and-resume the
-        // cursor on the v1 path if the IFR flag is later turned off.
-        CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting = true;
-
-        ChangeStreamReaderBuilder* readerBuilder =
-            ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
-        tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
-
-        // Set supported control events for the 'DocumentSourceChangeStreamTransform' stage. That
-        // stage will pick up the supported events from the change stream definition in the
-        // ExpressionContext later.
-        auto controlEventTypes =
-            readerBuilder->getControlEventTypesOnDataShard(opCtx, changeStream);
-
-        std::vector<std::string> supportedEvents(controlEventTypes.begin(),
-                                                 controlEventTypes.end());
-        spec.setSupportedEvents(std::move(supportedEvents));
+        configureV2Reader(expCtx, changeStream, spec);
     }
 
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    // Only increment during actual execution, not query shape parsing.
-    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() &&
-        expCtx->updateChangeStreamFeatureCounters()) {
-        if (spec.getShowExpandedEvents().value_or(false))
-            csOptShowExpandedEvents.add(1);
-        if (spec.getShowMigrationEvents().value_or(false))
-            csOptShowMigrationEvents.add(1);
-        if (spec.getShowSystemEvents().value_or(false))
-            csOptShowSystemEvents.add(1);
-        if (spec.getShowRawUpdateDescription().value_or(false))
-            csOptShowRawUpdateDescription.add(1);
-        if (spec.getIgnoreRemovedShards().value_or(false))
-            csOptIgnoreRemovedShards.add(1);
-        if (spec.getMatchCollectionUUIDForUpdateLookup().value_or(false))
-            csOptMatchCollectionUUIDForUpdateLookup.add(1);
-
-        if (userSetResumeAfter)
-            csOptResumeAfter.add(1);
-        if (userSetStartAfter)
-            csOptStartAfter.add(1);
-        if (userSetStartAtOperationTime)
-            csOptStartAtOperationTime.add(1);
-
-        incrementFullDocumentMetric(spec.getFullDocument());
-        incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
-        incrementShowEndOfTransactionMetric(
-            spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff));
-        incrementScopeMetric(changeStream.getChangeStreamType());
-
-        // Prevent updating the feature counters again for the same query.
-        expCtx->setUpdateChangeStreamFeatureCounters(false);
-    }
+    incrementChangeStreamFeatureMetrics(expCtx, spec, changeStream, userOptions);
 
     return change_stream::pipeline_helpers::buildPipeline(expCtx, spec, resumeToken);
 }
