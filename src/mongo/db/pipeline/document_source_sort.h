@@ -207,6 +207,8 @@ public:
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.preservesCardinality = true;
+        // Bounded sorts require almost-sorted input and can emit results before consuming it all.
+        constraints.consumesAllInputInAnyOrder = !isBoundedSortStage();
         // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.
         constraints.canSwapWithMatch = !_sortExecutor->hasLimit();
         return constraints;

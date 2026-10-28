@@ -108,7 +108,7 @@ public:
      */
     std::vector<AccumulationStatement>& getMutableAccumulationStatements();
 
-    StageConstraints constraints(PipelineSplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kBlocking,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,

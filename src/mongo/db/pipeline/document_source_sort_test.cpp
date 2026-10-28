@@ -133,6 +133,30 @@ private:
 };
 
 
+TEST_F(DocumentSourceSortTest, ConsumesAllInputInAnyOrder) {
+    createSort();
+    ASSERT_TRUE(sort()->constraints(PipelineSplitState::kUnsplit).consumesAllInputInAnyOrder);
+
+    DocumentSourceContainer container{sort(), DocumentSourceLimit::create(getExpCtx(), 10)};
+    sort()->optimizeAt(container.begin(), &container);
+    ASSERT_TRUE(sort()->getLimit());
+    ASSERT_TRUE(sort()->constraints(PipelineSplitState::kUnsplit).consumesAllInputInAnyOrder);
+}
+
+TEST_F(DocumentSourceSortTest, BoundedSortCannotConsumeAllInputInAnyOrder) {
+    for (auto limit : {0LL, 10LL}) {
+        auto boundedSort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), getExpCtx()},
+                                                                 DocumentSourceSort::kMin,
+                                                                 -1,
+                                                                 limit,
+                                                                 false,
+                                                                 getExpCtx());
+        ASSERT_TRUE(boundedSort->isBoundedSortStage());
+        ASSERT_FALSE(
+            boundedSort->constraints(PipelineSplitState::kUnsplit).consumesAllInputInAnyOrder);
+    }
+}
+
 TEST_F(DocumentSourceSortTest, RejectsNonObjectSpec) {
     BSONObj spec = BSON("$sort" << 1);
     BSONElement specElement = spec.firstElement();

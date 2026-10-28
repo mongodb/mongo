@@ -330,6 +330,9 @@ struct [[MONGO_MOD_PUBLIC]] StageConstraints {
     // Indicates whether this is a streaming or blocking stage.
     StreamType streamType;
 
+    // True if this stage consumes all input and can do so in any order.
+    bool consumesAllInputInAnyOrder = false;
+
     // True if this stage does not generate results itself, and instead pulls inputs from an
     // input DocumentSource (via 'pSource'). Must be set using the 'setConstraintsForNoInputSources'
     // helper method.
@@ -406,6 +409,7 @@ struct [[MONGO_MOD_PUBLIC]] StageConstraints {
             facetRequirement == other.facetRequirement &&
             transactionRequirement == other.transactionRequirement &&
             lookupRequirement == other.lookupRequirement && streamType == other.streamType &&
+            consumesAllInputInAnyOrder == other.consumesAllInputInAnyOrder &&
             requiresInputDocSource == other.requiresInputDocSource &&
             outputDependsOnSingleInput == other.outputDependsOnSingleInput &&
             preservesCardinality == other.preservesCardinality &&

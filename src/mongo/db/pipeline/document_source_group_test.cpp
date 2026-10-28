@@ -122,6 +122,67 @@ public:
     }
 };
 
+TEST_F(DocumentSourceGroupTest, ConsumesAllInputInAnyOrderWithoutAccumulators) {
+    const auto spec = fromjson("{$group: {_id: '$key'}}");
+    auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_TRUE(group->constraints().consumesAllInputInAnyOrder);
+}
+
+TEST_F(DocumentSourceGroupTest, ConsumesAllInputInAnyOrderWithCommutativeAccumulators) {
+    const auto spec =
+        fromjson("{$group: {_id: '$key', sum: {$sum: '$value'}, max: {$max: '$value'}}}");
+    auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_TRUE(group->constraints().consumesAllInputInAnyOrder);
+}
+
+TEST_F(DocumentSourceGroupTest, ConsumesAllInputInAnyOrderIsFalseWithNoncommutativeAccumulators) {
+    for (auto accumulator : {"$first", "$last", "$push"}) {
+        const auto spec =
+            BSON("$group" << BSON("_id" << "$key" << "value" << BSON(accumulator << "$value")));
+        auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(group->constraints().consumesAllInputInAnyOrder);
+    }
+}
+
+TEST_F(DocumentSourceGroupTest, ConsumesAllInputInAnyOrderTracksAccumulatorChanges) {
+    const auto spec =
+        fromjson("{$group: {_id: '$key', sum: {$sum: '$value'}, first: {$first: '$value'}}}");
+    auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(group->constraints().consumesAllInputInAnyOrder);
+
+    auto* groupStage = dynamic_cast<DocumentSourceGroup*>(group.get());
+    ASSERT(groupStage);
+    groupStage->getMutableAccumulationStatements().pop_back();
+    ASSERT_TRUE(group->constraints().consumesAllInputInAnyOrder);
+
+    const auto firstSpec = fromjson("{first: {$first: '$value'}}");
+    groupStage->getMutableAccumulationStatements().front() =
+        AccumulationStatement::parseAccumulationStatement(
+            getExpCtx().get(), firstSpec.firstElement(), getExpCtx()->variablesParseState);
+    ASSERT_FALSE(group->constraints().consumesAllInputInAnyOrder);
+
+    groupStage->getMutableAccumulationStatements().front().expr.factory = [&]() {
+        return make_intrusive<AccumulatorSum>(getExpCtx().get());
+    };
+    ASSERT_TRUE(group->constraints().consumesAllInputInAnyOrder);
+}
+
+
+TEST_F(DocumentSourceGroupTest, StreamingGroupCannotConsumeAllInputInAnyOrder) {
+    const auto noAccumulators =
+        fromjson("{$_internalStreamingGroup: {_id: '$key', $monotonicIdFields: ['_id']}}");
+    auto group =
+        DocumentSourceStreamingGroup::createFromBson(noAccumulators.firstElement(), getExpCtx());
+    ASSERT_FALSE(group->constraints().consumesAllInputInAnyOrder);
+
+    const auto commutativeAccumulators = fromjson(
+        "{$_internalStreamingGroup: {_id: '$key', total: {$sum: '$value'}, "
+        "$monotonicIdFields: ['_id']}}");
+    group = DocumentSourceStreamingGroup::createFromBson(commutativeAccumulators.firstElement(),
+                                                         getExpCtx());
+    ASSERT_FALSE(group->constraints().consumesAllInputInAnyOrder);
+}
+
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
     expCtx->setInRouter(true);  // Disallow external sort.

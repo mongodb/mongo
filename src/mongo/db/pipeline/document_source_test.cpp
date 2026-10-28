@@ -90,6 +90,16 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(mockExtension,
 
 using DocumentSourceExtensionParserTest = AggregationContextFixture;
 
+TEST_F(DocumentSourceExtensionParserTest, ConsumesAllInputInAnyOrderDefaultsToFalse) {
+    auto constraints = DocumentSourceMockExtension::create(getExpCtx())->constraints();
+    ASSERT_FALSE(constraints.consumesAllInputInAnyOrder);
+
+    auto other = constraints;
+    ASSERT_TRUE(constraints == other);
+    other.consumesAllInputInAnyOrder = true;
+    ASSERT_FALSE(constraints == other);
+}
+
 TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
     LiteParsedDocumentSource::registerParser(
         "$customExtension",

@@ -12,6 +12,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
 #include <string_view>
 #include <vector>
 
@@ -38,6 +39,16 @@ public:
 
     Id getId() const override {
         return id;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        auto constraints = DocumentSourceGroupBase::constraints(pipeState);
+        const auto& accumulators = getAccumulationStatements();
+        constraints.consumesAllInputInAnyOrder =
+            std::all_of(accumulators.begin(), accumulators.end(), [](const auto& accumulator) {
+                return accumulator.expr.factory()->isCommutative();
+            });
+        return constraints;
     }
 
     /**

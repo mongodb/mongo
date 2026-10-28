@@ -327,6 +327,36 @@ TEST_F(BucketAutoTests, EvaluatesAccumulatorsInOutputField) {
     ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 4, max : 6}, avg : 5}")));
 }
 
+TEST_F(BucketAutoTests, PositionalAccumulatorsPreserveInputOrder) {
+    auto spec = fromjson(R"({
+        $bucketAuto: {
+            groupBy: '$x',
+            buckets: 2,
+            output: {
+                first: {$first: '$a'},
+                last: {$last: '$a'},
+                firstN: {$firstN: {input: '$a', n: 2}},
+                lastN: {$lastN: {input: '$a', n: 2}}
+            }
+        }
+    })");
+    // Input order differs from groupBy order within both buckets.
+    auto results = getResults(spec,
+                              {Document{{"x", 6}, {"a", 10}},
+                               Document{{"x", 3}, {"a", 20}},
+                               Document{{"x", 4}, {"a", 30}},
+                               Document{{"x", 1}, {"a", 40}},
+                               Document{{"x", 5}, {"a", 50}},
+                               Document{{"x", 2}, {"a", 60}}});
+    ASSERT_EQ(results.size(), 2U);
+    ASSERT_DOCUMENT_EQ(results[0],
+                       Document(fromjson("{_id: {min: 1, max: 4}, first: 20, last: 60, "
+                                         "firstN: [20, 40], lastN: [40, 60]}")));
+    ASSERT_DOCUMENT_EQ(results[1],
+                       Document(fromjson("{_id: {min: 4, max: 6}, first: 10, last: 50, "
+                                         "firstN: [10, 30], lastN: [30, 50]}")));
+}
+
 TEST_F(BucketAutoTests, EvaluatesNonFieldPathExpressionInGroupByField) {
     auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : {$add : ['$x', 1]}, buckets : 2}}");
     auto results = getResults(
