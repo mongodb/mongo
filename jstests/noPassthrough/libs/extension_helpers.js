@@ -133,6 +133,11 @@ export function deleteExtensionConfigs(names) {
 /**
  * Runs a test function in environments with one or more extension loaded, ensuring proper
  * generation and cleanup of .conf files.
+ *
+ * Each entry of `topologiesToTest` is either a topology name, or an object of the form
+ * `{topology, mongodOptions}` where `mongodOptions` overrides `additionalMongodOptions` for that
+ * topology only. The object form allows the same topology to run more than once with different
+ * options, e.g. once per feature flag value.
  */
 export function withExtensions(
     extToOptionsMap,
@@ -161,7 +166,7 @@ export function withExtensions(
         extensionsToLoad.push(extensionName);
     }
 
-    const options = Object.assign(
+    const baseOptions = Object.assign(
         {
             loadExtensions: extensionsToLoad,
             extensionsConfigPath: extensionConfDir,
@@ -169,34 +174,32 @@ export function withExtensions(
         additionalMongodOptions,
     );
 
-    function runStandaloneTest(func) {
+    function runStandaloneTest(func, options) {
         const mongodConn = MongoRunner.runMongod(options);
         func(mongodConn, null);
         MongoRunner.stopMongod(mongodConn);
     }
 
-    function runShardedTest(func) {
-        {
-            const shardingTest = new ShardingTest(
-                Object.assign(
-                    {
-                        shards: 1,
-                        rs: {nodes: 1},
-                        mongos: 1,
-                        config: 1,
-                        mongosOptions: options,
-                        configOptions: options,
-                        rsOptions: options,
-                    },
-                    shardingOptions,
-                ),
-            );
-            func(shardingTest.s, shardingTest);
-            shardingTest.stop();
-        }
+    function runShardedTest(func, options) {
+        const shardingTest = new ShardingTest(
+            Object.assign(
+                {
+                    shards: 1,
+                    rs: {nodes: 1},
+                    mongos: 1,
+                    config: 1,
+                    mongosOptions: options,
+                    configOptions: options,
+                    rsOptions: options,
+                },
+                shardingOptions,
+            ),
+        );
+        func(shardingTest.s, shardingTest);
+        shardingTest.stop();
     }
 
-    function runReplicaSetTest(func) {
+    function runReplicaSetTest(func, options) {
         const rst = new ReplSetTest({nodes: 1});
         rst.startSet(options);
         rst.initiate();
@@ -206,13 +209,21 @@ export function withExtensions(
     }
 
     try {
-        topologiesToTest.forEach(function (topology) {
+        topologiesToTest.forEach(function (entry) {
+            const topology = typeof entry === "string" ? entry : entry.topology;
+            const overrides = typeof entry === "string" ? {} : entry.mongodOptions || {};
+            const options = Object.deepMerge(baseOptions, overrides);
+
             if (topology === "standalone") {
-                runStandaloneTest(testFn);
+                runStandaloneTest(testFn, options);
             } else if (topology === "sharded") {
-                runShardedTest(testFn);
+                runShardedTest(testFn, options);
             } else if (topology === "replica_set") {
-                runReplicaSetTest(testFn);
+                runReplicaSetTest(testFn, options);
+            } else {
+                // Without this, a typo in a topology name silently starts nothing and the test
+                // passes vacuously.
+                throw new Error(`Unknown topology '${topology}' passed to withExtensions`);
             }
         });
     } finally {
@@ -245,18 +256,16 @@ export function withExtensionsAndMongot(
         return testFn(connection, mongotmock, shardingTest);
     };
 
-    // Build mongod options with mongot settings, merging with any additional options.
-    // We need to deep-merge setParameter since both we and the caller may provide values.
+    // Build mongod options with mongot settings, merging with any additional options. Caller
+    // parameters take precedence over the mongot ones.
     const mongotSetParams = {
         mongotHost,
         searchIndexManagementHostAndPort: mongotHost,
     };
-    const callerSetParams = additionalMongodOptions.setParameter || {};
-    const mergedSetParams = Object.assign({}, mongotSetParams, callerSetParams);
-
-    const additionalOptions = Object.assign({}, additionalMongodOptions, {
-        setParameter: mergedSetParams,
-    });
+    const additionalOptions = Object.deepMerge(
+        {setParameter: mongotSetParams},
+        additionalMongodOptions,
+    );
 
     try {
         withExtensions(

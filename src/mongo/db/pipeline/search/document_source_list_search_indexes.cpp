@@ -3,7 +3,9 @@
 
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/version_context.h"
@@ -11,10 +13,11 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
     listSearchIndexes,
     DocumentSourceListSearchIndexes::LiteParsedListSearchIndexes::parse,
-    AllowedWithApiStrict::kNeverInVersion1);
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagExtensionSearchIndexManagement);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listSearchIndexes,
                                                    DocumentSourceListSearchIndexes,

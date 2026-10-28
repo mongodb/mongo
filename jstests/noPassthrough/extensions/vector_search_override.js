@@ -2,7 +2,7 @@
  * Tests that the extension $vectorSearch stage has overridden the server implementation
  * when loaded with featureFlagVectorSearchExtension enabled.
  *
- * vector_search_ifr_toggle.js extensivley tests the toggling behavior between extension and legacy $vectorSearch.
+ * vector_search_ifr_toggle.js extensively tests the toggling behavior between extension and legacy $vectorSearch.
  *
  * @tags: [featureFlagExtensionsAPI]
  */

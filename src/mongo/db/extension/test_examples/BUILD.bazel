@@ -85,6 +85,7 @@ extensions_with_config(
         ":foo_extension_v2_signed_lib",
         ":vector_search_extension_signed_lib",
         ":search_extension_signed_lib",
+        ":search_index_management_extension_signed_lib",
         ":assert_deadline_increased_after_batch_extension_signed_lib",
     ],
 )
@@ -319,6 +320,16 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "search_extension",
     srcs = ["search.cpp"],
+)
+
+# "search_index_management" is used to test that we can override the built-in search index
+# management commands and stage ($listSearchIndexes) implementations. It must not have the
+# _mongo_extension suffix so that it doesn't get loaded in the Extensions-enabled variant, since
+# that would override real search index management commands and stages once
+# featureFlagExtensionSearchIndexManagement is enabled.
+signed_mongo_cc_extension_shared_library(
+    name = "search_index_management_extension",
+    srcs = ["search_index_management.cpp"],
 )
 
 # "assert_deadline_increased_after_batch" is used to test that the operation deadline
