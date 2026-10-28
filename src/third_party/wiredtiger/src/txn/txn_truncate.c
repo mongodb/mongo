@@ -160,6 +160,7 @@ static int
 __txn_insert_truncate_entry_helper(
   WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, WT_TRUNCATE **tp)
 {
+    struct timespec tsp;
     WT_DECL_RET;
     WT_TRUNCATE *entry = *tp;
     WT_TRUNCATE_LIST *truncate_list = &layered_table->truncate_list;
@@ -167,10 +168,20 @@ __txn_insert_truncate_entry_helper(
     WT_RET(__wt_session_get_dhandle(session, layered_table->ingest_uri, NULL, NULL, 0));
     WT_ERR(__wt_txn_truncate(session, entry));
 
-    /* At this point, adding the entry to the truncate list will not fail. */
+    /* At this point, adding the entry to the truncate list will not error (it can only assert). */
     __log_truncate_entry(session, layered_table, entry);
 
+    tsp.tv_sec = 1;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_DISAGG_TRUNCATE_ENTRY_INSERT, &tsp);
+
     __wt_writelock(session, &truncate_list->lock);
+
+    WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECONFIGURING_STEP_UP),
+      "truncate list entries cannot be inserted during step-up");
+    WT_ASSERT_ALWAYS(session,
+      !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader),
+      "truncate list entries cannot be inserted in leader mode");
 
     if (TAILQ_EMPTY(&truncate_list->qh))
         WT_DHANDLE_ACQUIRE(&layered_table->iface);

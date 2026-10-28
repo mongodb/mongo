@@ -1070,6 +1070,7 @@ connection_runtime_config = [
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'conn_close_stress_log_printf', 'disagg_pickup_skip_signal',
         'disagg_role_transition',
+        'disagg_truncate_entry_insert',
         'drop_deferred_hold', 'evict_reposition',
         'failpoint_disagg_checkpoint_apply',
         'disagg_stable_dhandle_delay',

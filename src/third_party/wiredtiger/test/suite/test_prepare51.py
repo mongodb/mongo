@@ -80,3 +80,53 @@ class test_prepare51(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.rollback_transaction()
         prep_session.rollback_transaction()
+
+    # Reversing conflicts on another prepared update before it returns a key. The reversal then
+    # returns the key the walk returned before the first conflict, and the key order check must
+    # restart for that return too.
+    def test_reverse_after_second_conflict(self):
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+        with closing(self.session.open_cursor(self.uri)) as cursor:
+            for key in self.committed:
+                cursor[key] = 'value'
+
+        conflict = '/conflict with a prepared update/'
+        step = lambda c: c.next() if self.forward else c.prev()
+        step_back = lambda c: c.prev() if self.forward else c.next()
+
+        def prepare(key, ts):
+            prep_session = self.conn.open_session()
+            prep_cursor = prep_session.open_cursor(self.uri)
+            prep_session.begin_transaction()
+            prep_cursor[key] = 'prepared'
+            prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(ts))
+            return prep_session, prep_cursor
+
+        first = prepare(self.prepared, 10)
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(15))
+        visited = self.committed if self.forward else list(reversed(self.committed))
+        for key in visited:
+            self.assertEqual(step(cursor), 0)
+            self.assertEqual(cursor.get_key(), key)
+        self.assertRaisesException(wiredtiger.WiredTigerError, lambda: step(cursor), conflict)
+
+        # Prepare the key the walk last returned, and read it under a new snapshot.
+        second = prepare(visited[-1], 30)
+        self.session.commit_transaction()
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(35))
+        self.assertRaisesException(wiredtiger.WiredTigerError, lambda: step_back(cursor), conflict)
+        second[0].rollback_transaction()
+
+        # Reversing returns the last returned key again, then every key before it.
+        returned = []
+        while step_back(cursor) == 0:
+            returned.append(cursor.get_key())
+        self.assertEqual(returned, list(reversed(visited)))
+
+        cursor.close()
+        self.session.rollback_transaction()
+        first[0].rollback_transaction()
+        for session, prep_cursor in (first, second):
+            prep_cursor.close()
+            session.close()

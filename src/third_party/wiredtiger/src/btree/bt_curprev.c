@@ -558,10 +558,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
     uint64_t time_start;
     uint32_t flags;
     bool key_out_of_bounds, need_walk, newpage, repositioned, restart;
-#ifdef HAVE_DIAGNOSTIC
-    bool inclusive_set;
-    WT_NOT_READ(inclusive_set, false);
-#endif
 
     cursor = &cbt->iface;
     key_out_of_bounds = need_walk = newpage = repositioned = false;
@@ -758,39 +754,7 @@ err:
         else
             F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 #ifdef HAVE_DIAGNOSTIC
-        /*
-         * Restart the key order check if prev is called after a next returned a prepare conflict
-         * error, i.e cursor has changed direction at a prepared update, hence current key returned
-         * could be same as earlier returned key.
-         *
-         * eg: Initial data set : (1,2,3,...10) insert key 11 in a prepare transaction. loop on next
-         * will return 1,2,3...10 and subsequent call to next will return a prepare conflict. Now if
-         * we call prev key 10 will be returned which will be same as earlier returned key.
-         *
-         * Additionally, restart the check when we are using read uncommitted isolation mode and
-         * cross a page boundary. It's possible to see out-of-order keys when the earlier returned
-         * key is removed and new keys are inserted at the end of the page.
-         */
-        if (F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT) ||
-          (session->txn->isolation == WT_ISO_READ_UNCOMMITTED && newpage))
-            __wt_cursor_key_order_reset(cbt);
-        ret = __wti_cursor_key_order_check(session, cbt, false);
-
-        if (need_walk) {
-            /*
-             * The bounds positioning code relies on the assumption that if we had to walk then we
-             * can't possibly have walked to the upper bound. We check that assumption here by
-             * comparing the upper bound with our current key or recno. Force inclusive to be false
-             * so we don't consider the bound itself.
-             */
-            inclusive_set = F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
-            F_CLR(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
-            ret = __wt_compare_bounds(
-              session, cursor, &cbt->iface.key, cbt->recno, true, &key_out_of_bounds);
-            WT_ASSERT(session, ret == 0 && !key_out_of_bounds);
-            if (inclusive_set)
-                F_SET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
-        }
+        ret = __wti_cursor_return_check(session, cbt, false, newpage, need_walk);
 #endif
         break;
     case WT_PREPARE_CONFLICT:
@@ -806,8 +770,18 @@ err:
          */
         if (repositioned)
             WT_TRET(__cursor_reset(cbt));
-        else
+        else {
             F_SET(cbt, WT_CBT_ITERATE_RETRY_PREV);
+#ifdef HAVE_DIAGNOSTIC
+            /*
+             * A prepare conflict while the cursor is changing direction consumes the flag below
+             * that restarts the key order check, so restart it now: the next key returned can be
+             * the key returned before the first prepare conflict.
+             */
+            if (F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT))
+                __wt_cursor_key_order_reset(cbt);
+#endif
+        }
         break;
     default:
         WT_TRET(__cursor_reset(cbt));
