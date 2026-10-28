@@ -4,6 +4,9 @@
  *   # "version" parameter for change streams is only available from v8.2 onwards.
  *   requires_fcv_82,
  *   uses_change_streams,
+ *   # The test explicitly opens v1 change streams; suites that stamp
+ *   # showEndOfTransaction: "required" are incompatible with them.
+ *   assumes_change_streams_v1,
  * ]
  */
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";

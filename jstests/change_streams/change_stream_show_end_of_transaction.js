@@ -8,6 +8,8 @@
  *   requires_fcv_90,
  *   uses_change_streams,
  *   featureFlagChangeStreamReaderV2,
+ *   # The test asserts on endOfTransaction events; suites that filter them out must skip it.
+ *   uses_end_of_transaction_events,
  * ]
  */
 

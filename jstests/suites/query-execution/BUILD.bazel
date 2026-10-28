@@ -155,6 +155,51 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "change_streams_eot_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_eot_passthrough.yml",
+    shard_count = 5,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_eot_whole_cluster_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_eot_whole_cluster_passthrough.yml",
+    shard_count = 5,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_eot_whole_db_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_eot_whole_db_passthrough.yml",
+    shard_count = 5,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "change_streams_mongos_sessions_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough.yml",
     shard_count = 8,

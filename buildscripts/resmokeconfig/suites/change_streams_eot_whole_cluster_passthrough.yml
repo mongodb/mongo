@@ -1,0 +1,90 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/change_streams/**/*.js
+  exclude_files:
+    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
+    - jstests/change_streams/create_event_from_chunk_migration.js
+
+    # TODO: SERVER-114511 re-enable this test.
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
+    # Only relevant for single-collection change streams.
+    - jstests/change_streams/metadata_notifications.js
+
+    # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
+    - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+  exclude_with_any_tags:
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag
+    # to be warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # Not relevant for whole-cluster change streams.
+    - do_not_run_in_whole_cluster_passthrough
+    # These tests make assumptions about change stream results that are no longer true once
+    # operations get bundled into transactions.
+    - change_stream_does_not_expect_txns
+    # No need to use a passthrough to add transactions to a test that already has its own
+    # transactions.
+    - uses_transactions
+    # The passthrough filters out endOfTransaction events, so tests that explicitly assert on
+    # them cannot run here.
+    - uses_end_of_transaction_events
+    # The 'showEndOfTransaction' option is only supported for v2 change stream readers.
+    - assumes_change_streams_v1
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
+      # Enable causal consistency for change streams suites using 1 node replica sets. See
+      # change_streams.yml for detailed explanation. The whole-cluster passthrough is layered
+      # with the transactions passthrough, the server-side endOfTransaction event filter, and
+      # implicit stamping of showEndOfTransaction: "required" (imported last so it wraps every
+      # other override).
+      eval: >-
+        await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import('jstests/libs/override_methods/query/implicit_whole_cluster_changestreams.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+        await import('jstests/libs/override_methods/enable_sessions.js');
+        await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
+        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        await import('jstests/libs/override_methods/query/implicit_filter_eot_changestreams.js');
+        await import('jstests/libs/override_methods/query/implicit_show_end_of_transaction.js');
+      # Set longer host discovery time to handle change stream resumable errors.
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        # End-of-transaction change stream support: synthesize endOfTransaction change events
+        # for unprepared multi-statement transactions and allow streams that request them.
+        featureFlagEndOfTransactionChangeEventSynthesis: true
+        allowEndOfTransaction: true
+    num_nodes: 1

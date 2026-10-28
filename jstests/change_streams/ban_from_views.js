@@ -3,6 +3,9 @@
  *
  * @tags: [
  *   assumes_read_preference_unchanged,
+ *   # The test asserts on v1 change stream error messages; suites that stamp
+ *   # showEndOfTransaction: "required" are incompatible with them.
+ *   assumes_change_streams_v1,
  * ]
  */
 import {
