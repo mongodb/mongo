@@ -43,6 +43,8 @@ last-patch:
       ticket: SERVER-121079
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-126499
+    - test_file: jstests/core/index/index_for_sort.js
+      ticket: SERVER-137529
     - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
@@ -186,6 +188,8 @@ last-continuous:
       ticket: SERVER-121079
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-126499
+    - test_file: jstests/core/index/index_for_sort.js
+      ticket: SERVER-137529
     - test_file: jstests/core/query/boolean_simplifier_tautology.js
       ticket: SERVER-131802
     - test_file: jstests/core/query/bson_size_limit_agg.js
@@ -377,6 +381,8 @@ last-lts:
       ticket: SERVER-121079
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-126499
+    - test_file: jstests/core/index/index_for_sort.js
+      ticket: SERVER-137529
     - test_file: jstests/core/query/boolean_simplifier_tautology.js
       ticket: SERVER-131802
     - test_file: jstests/core/query/bson_size_limit_agg.js
