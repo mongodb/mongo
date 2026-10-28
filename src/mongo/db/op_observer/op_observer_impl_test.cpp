@@ -4191,6 +4191,40 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
     }
 }
 
+TEST_F(OpObserverTest, ChangeStreamPreImageRecordedForTenantScopedCollection) {
+    // A write to a tenant-scoped collection with pre-images enabled records the pre-image in the
+    // shared (tenant-less) pre-images collection. The tenant-id is simply ignored if set.
+    auto opObserver = opObserverRegistry();
+    opObserver->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+    opObserver->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    resetOplogAndTransactions(opCtx);
+
+    const BSONObj kPreImageDoc = BSON("_id" << 0 << "x" << 0);
+
+    WriteUnitOfWork wuow(opCtx);
+    AutoGetCollection locks(opCtx, nss, MODE_IX);
+    ASSERT(locks->ns().tenantId());
+    CollectionUpdateArgs updateArgs{kPreImageDoc};
+    updateArgs.criteria = BSON("_id" << 0);
+    updateArgs.update = BSON("$set" << BSON("x" << 1));
+    updateArgs.updatedDoc = BSON("_id" << 0 << "x" << 1);
+    updateArgs.changeStreamPreAndPostImagesEnabledForCollection = true;
+    updateArgs.stmtIds = {kUninitializedStmtId};
+    OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
+    opObserver->onUpdate(opCtx, updateEntryArgs);
+    wuow.commit();
+
+    auto updateOplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+    BSONObj container;
+    ChangeStreamPreImageId preImageId(uuid, updateOplogEntry.getOpTime().getTimestamp(), 0);
+    ChangeStreamPreImage preImage = getChangeStreamPreImage(opCtx, preImageId, &container);
+    ASSERT_BSONOBJ_EQ(kPreImageDoc, preImage.getPreImage());
+}
+
 struct InsertTestCase {
     bool isRetryableWrite;
     int numDocsToInsert;
@@ -6635,6 +6669,86 @@ TEST_F(BatchedWriteOutputsTest, TestBatchedWritePreImagesWithMixedFromMigrate) {
                                               BSON("_id" << preImageId1.toBSON()),
                                               /*invariantOnError=*/false);
         ASSERT_TRUE(doc.isEmpty()) << "Pre-image should NOT be recorded for fromMigrate operation";
+    }
+}
+
+// A batched write to a tenant-scoped collection with pre-images enabled carries a nonempty
+// 'tid' on its operations. This exercises the applyOps chain pre-image helper
+// (writeChangeStreamPreImagesForApplyOpsEntry).
+TEST_F(BatchedWriteOutputsTest, TestBatchedWritePreImagesForTenantScopedCollection) {
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    auto* opCtx = opCtxRaii.get();
+
+    // Register the ChangeStreamPreImagesOpObserver to handle pre-image recording.
+    opObserverRegistry()->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+
+    // Create the pre-images collection.
+    ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
+
+    // Create a tenant-scoped collection with pre-images enabled.
+    const TenantId tenantId{OID::gen()};
+    const auto preImageNss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test", "tenant_preimage_coll");
+    const auto preImageUuid = UUID::gen();
+    writeConflictRetry(opCtx, "createCollection", preImageNss, [&] {
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoTimestamp);
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        WriteUnitOfWork wunit(opCtx);
+        AutoGetCollection collRaii(opCtx, preImageNss, MODE_X);
+        auto db = collRaii.ensureDbExists(opCtx);
+        CollectionOptions opts;
+        opts.uuid = preImageUuid;
+        opts.changeStreamPreAndPostImagesOptions.setEnabled(true);
+        invariant(db->createCollection(opCtx, preImageNss, opts));
+        wunit.commit();
+    });
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    auto batchUpdate = [&](OperationContext* opCtx, const CollectionPtr& coll, int id) {
+        const auto preImageDoc = BSON("_id" << id << "x" << 0);
+        CollectionUpdateArgs collUpdateArgs{preImageDoc};
+        collUpdateArgs.criteria = BSON("_id" << id);
+        collUpdateArgs.update = BSON("$set" << BSON("x" << id));
+        collUpdateArgs.updatedDoc = BSON("_id" << id << "x" << id);
+        collUpdateArgs.source = OperationSource::kStandard;
+        collUpdateArgs.changeStreamPreAndPostImagesEnabledForCollection = true;
+        auto args = OplogUpdateEntryArgs(&collUpdateArgs, coll);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
+    };
+
+    {
+        AutoGetCollection autoColl(opCtx, preImageNss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+
+        batchUpdate(opCtx, *autoColl, 0);
+        batchUpdate(opCtx, *autoColl, 1);
+        wuow.commit();
+    }
+
+    auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+    ASSERT(oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps);
+
+    // The inner operations must carry the tenant id, otherwise this test would not exercise the
+    // removed invariant.
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 2u);
+    for (const auto& innerEntry : innerEntries) {
+        ASSERT_TRUE(innerEntry.getTid().has_value());
+        ASSERT_EQ(*innerEntry.getTid(), tenantId);
+    }
+
+    // Both pre-images must be recorded in the shared pre-images collection.
+    for (int id = 0; id < 2; ++id) {
+        BSONObj container;
+        ChangeStreamPreImageId preImageId{preImageUuid, oplogEntry.getOpTime().getTimestamp(), id};
+        auto preImage = getChangeStreamPreImage(opCtx, preImageId, &container);
+        ASSERT_BSONOBJ_EQ(preImage.getPreImage(), BSON("_id" << id << "x" << 0));
     }
 }
 

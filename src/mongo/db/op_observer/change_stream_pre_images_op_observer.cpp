@@ -42,7 +42,6 @@ void writeChangeStreamPreImagesForApplyOpsEntry(
             !operation.getFromMigrate().value_or(false)) {
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
-            invariant(operation.getTid() == boost::none);
             writeChangeStreamPreImageEntry(
                 opCtx,
                 ChangeStreamPreImage{
@@ -139,7 +138,6 @@ void writeChangeStreamPreImageEntryIfNecessary(
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
         ChangeStreamPreImage preImage(std::move(id), opTimeBundle.wallClockTime, preImageDoc);
-        invariant(nss.tenantId() == boost::none);
         writeChangeStreamPreImageEntry(opCtx, preImage);
     }
 }

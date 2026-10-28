@@ -557,6 +557,77 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
     }
 }
 
+// Applying an oplog entry for a tenant-scoped collection carries a nonempty 'tid'. This exercises
+// the secondary / recovery pre-image path (writeChangeStreamPreImage in oplog.cpp).
+TEST_F(OplogApplierImplTest, ApplyOplogEntryToRecordChangeStreamPreImagesForTenantCollection) {
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+
+    // Setup the pre-images collection.
+    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
+        .createPreImagesCollection(_opCtx.get());
+
+    // Create a tenant-scoped collection with pre-images enabled.
+    const TenantId tenantId{OID::gen()};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test", "t");
+    CollectionOptions options;
+    options.uuid = kUuid;
+    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
+    createCollection(_opCtx.get(), nss, options);
+
+    // The secondary and both recovery modes record change stream pre-images.
+    const std::vector<OplogApplication::Mode> modes{OplogApplication::Mode::kSecondary,
+                                                    OplogApplication::Mode::kUnstableRecovering,
+                                                    OplogApplication::Mode::kStableRecovering};
+
+    int docId{0};
+    for (const auto mode : modes) {
+        const auto document = BSON("_id" << docId);
+        ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {document}, 0));
+
+        // Make a delete oplog entry for the tenant-scoped collection.
+        auto op = makeOplogEntry(
+            [opCtx = _opCtx.get()] {
+                WriteUnitOfWork wuow{opCtx};
+                ScopeGuard guard{[&wuow] {
+                    wuow.commit();
+                }};
+                return repl::getNextOpTime(opCtx);
+            }(),
+            repl::OpTypeEnum::kDelete,
+            nss,
+            options.uuid,
+            document,
+            {document},
+            boost::none);
+
+        // The oplog entry must carry a nonempty tid, otherwise this test would not exercise the
+        // removed invariant.
+        ASSERT_TRUE(op.getTid().has_value()) << OplogApplication::modeToString(mode);
+        ASSERT_EQ(*op.getTid(), tenantId) << OplogApplication::modeToString(mode);
+
+        // Apply the oplog entry in the given application mode.
+        ASSERT_OK(
+            _applyOplogEntryOrGroupedInsertsWrapper(_opCtx.get(), ApplierOperation{&op}, mode))
+            << OplogApplication::modeToString(mode);
+
+        // Exactly one pre-image must be recorded in the shared pre-images collection.
+        ChangeStreamPreImageId preImageId{*options.uuid, op.getOpTime().getTimestamp(), 0};
+        BSONObj preImageDocumentKey = BSON("_id" << preImageId.toBSON());
+        auto preImageLoadResult =
+            getStorageInterface()->findById(_opCtx.get(),
+                                            NamespaceString::kChangeStreamPreImagesNamespace,
+                                            preImageDocumentKey.firstElement());
+        ASSERT_OK(preImageLoadResult) << OplogApplication::modeToString(mode);
+        const auto preImage =
+            ChangeStreamPreImage::parse(preImageLoadResult.getValue(), IDLParserContext{"test"});
+        ASSERT_BSONOBJ_EQ(preImage.getPreImage(), document) << OplogApplication::modeToString(mode);
+
+        ++docId;
+    }
+}
+
 // Test that applying extracted sub-ops from an applyOps with mixed fromMigrate values
 // correctly records pre-images only for non-fromMigrate operations. This mirrors the real
 // secondary oplog application path: extract sub-ops from applyOps, then apply individually.
