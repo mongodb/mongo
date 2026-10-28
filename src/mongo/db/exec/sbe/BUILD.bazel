@@ -149,6 +149,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:bson_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:co_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:compact_hash_agg.cpp",
+        "//src/mongo/db/exec/sbe/stages:exchange_worker_pool.cpp",
         "//src/mongo/db/exec/sbe/stages:extract_field_paths.cpp",
         "//src/mongo/db/exec/sbe/stages:fetch.cpp",
         "//src/mongo/db/exec/sbe/stages:hash_agg.cpp",
@@ -183,6 +184,7 @@ mongo_cc_library(
         "//src/mongo/db:sbe_values",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/memory_tracking",
@@ -292,6 +294,22 @@ mongo_cc_unit_test(
     deps = [
         ":query_sbe_makeobj_spec",
         ":sbe_unittest_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "exchange_worker_pool_test",
+    srcs = [
+        "exchange_worker_pool_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":query_sbe_stages",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel",
+        "//src/mongo/otel/traces:traces_test_util",
+        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

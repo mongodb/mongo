@@ -1471,6 +1471,21 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    internalQuerySBEExchangeMaxWorkers:
+        # Read directly by the process-wide ExchangeWorkerPool; it caps the pool, not a single
+        # plan, so it does not need to flush the SBE plan cache.
+        mod_visibility: needs_replacement
+        description: >-
+            Maximum number of worker threads that the SBE exchange worker pool can lease out at
+            the same time, across all running queries.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySBEExchangeMaxWorkers"
+        cpp_vartype: AtomicWord<int>
+        default: 64
+        validator:
+            gte: 0
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
