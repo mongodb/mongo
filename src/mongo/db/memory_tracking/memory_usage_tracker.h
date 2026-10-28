@@ -39,65 +39,49 @@ public:
                                           MemoryUsageLimit{std::numeric_limits<int64_t>::max()});
 
     /**
-     * Accumulates 'fullDiff' into this tracker's full counter and 'uniqueDiff' into its unique
-     * counter, and forwards both up the base chain.
+     * Accumulates 'diff' into this tracker and up the base chain.
      *
-     * The zero case is handled inline because it is hot and does nothing. Fixed-size accumulators
-     * make it common: $group calls add() once per input document with
-     * 'accumulator->getMemUsage() - prevMemUsage', which is always 0 for $sum and $count.
-     */
-    MONGO_COMPILER_ALWAYS_INLINE void add(int64_t fullDiff, int64_t uniqueDiff) {
-        if (fullDiff == 0 && uniqueDiff == 0) {
-            return;
-        }
-        addInternal(fullDiff, uniqueDiff);
-    }
-
-    /**
-     * Single-figure forms charge the same bytes to both figures. Defined inline so that callers
-     * reach the zero-diff early return in 'add()' without paying for an out-of-line call.
+     * The zero case is handled inline because it is hot and does nothing: a zero diff leaves the
+     * running total and the peak untouched, and leaves the chunk lower bound equal to
+     * '_lastReportedLowerBound' (that field is updated exactly when the bound moves), so no CurOp
+     * report is due either. Skipping it here avoids both the call and the walk up the base chain,
+     * including the integer division for the chunk check done by whichever level has chunking
+     * enabled.
+     *
+     * Fixed-size accumulators make this the common case: $group calls add() once per input
+     * document with 'accumulator->getMemUsage() - prevMemUsage', which is always 0 for $sum and
+     * $count, and for $min / $max over scalars.
      */
     MONGO_COMPILER_ALWAYS_INLINE void add(int64_t diff) {
-        add(diff, diff);
+        if (diff == 0) {
+            return;
+        }
+        addInternal(diff);
     }
 
+
+    /**
+     * Defined inline so that callers reach the zero-diff early return in 'add()' without paying for
+     * an out-of-line call.
+     */
     MONGO_COMPILER_ALWAYS_INLINE void set(int64_t total) {
-        set(total, total);
+        add(total - _inUseTrackedMemoryBytes);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void set(int64_t fullTotal, int64_t uniqueTotal) {
-        add(fullTotal - _inUseFullMemoryBytes, uniqueTotal - _inUseUniqueMemoryBytes);
-    }
-
-    /** The figure the limit is checked against: unique for the operation tracker, else full. */
     int64_t inUseTrackedMemoryBytes() const {
-        return limitFigure();
+        return _inUseTrackedMemoryBytes;
     }
 
-    /**
-     * The unique counter, on every tracker. For the operation tracker it is the total bytes that
-     * have been charged. For other trackers it is the number of bytes not charged to the operation
-     * tracker at allocation time.
-     */
-    int64_t inUseUniqueMemoryBytes() const {
-        return _inUseUniqueMemoryBytes;
-    }
-
-    /**
-     * The highest observed inUseTrackedMemoryBytes(): for the operation tracker the maximum unique
-     * memory bytes, otherwise the maximum full memory bytes.
-     */
     int64_t peakTrackedMemoryBytes() const {
         return _peakTrackedMemoryBytes;
     }
 
     /**
      * Returns true only if this tracker and every ancestor in the base chain are within their
-     * respective limits. A stage is compared on its full figure, the operation tracker on its
-     * unique one; see 'limitFigure()'. This is the check whose failure fails the operation.
+     * respective limits.
      */
     bool withinMemoryLimit(OperationContext* opCtx) const {
-        return limitFigure() <= _maxAllowedMemoryUsageBytes.get(opCtx) &&
+        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes.get(opCtx) &&
             (!_base || _base->withinMemoryLimit(opCtx));
     }
 
@@ -110,7 +94,7 @@ public:
      * heuristic having to know how deep or where in the chain the binding limit actually is.
      */
     int64_t remainingMemoryUsageBytes(OperationContext* opCtx) const {
-        int64_t remaining = _maxAllowedMemoryUsageBytes.get(opCtx) - limitFigure();
+        int64_t remaining = _maxAllowedMemoryUsageBytes.get(opCtx) - _inUseTrackedMemoryBytes;
         if (_base) {
             remaining = std::min(remaining, _base->remainingMemoryUsageBytes(opCtx));
         }
@@ -150,8 +134,8 @@ public:
 
     /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
-     * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes,
-     * _inUseFullMemoryBytes and _inUseUniqueMemoryBytes will be initialized to zero.
+     * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes and
+     * _inUseTrackedMemoryBytes will be initialized to zero.
      */
     SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const;
 
@@ -182,14 +166,6 @@ protected:
                              int64_t curOpWriteChunkSize);
 
     /**
-     * Marks this tracker as the operation tracker. Explicit rather than inferred from a missing
-     * '_base' or '_writeToCurOp', since a tracker can lose either without changing role.
-     */
-    void setIsOperationTracker() {
-        _isOperationTracker = true;
-    }
-
-    /**
      * Provide an extra function that is called whenever add() is invoked. Let it be set via this
      * method instead in the constructor to allow subclasses to capture "this."
      */
@@ -207,9 +183,9 @@ protected:
         }
 
         reportToCurOp();
-        const int64_t figure = limitFigure();
-        _lastReportedLowerBound =
-            figure == 0 ? -1 : (figure / _curOpWriteChunkSize) * _curOpWriteChunkSize;
+        _lastReportedLowerBound = _inUseTrackedMemoryBytes == 0
+            ? -1
+            : (_inUseTrackedMemoryBytes / _curOpWriteChunkSize) * _curOpWriteChunkSize;
     }
 
     /**
@@ -229,11 +205,12 @@ protected:
 
 private:
     /**
-     * Adds both diffs to this tracker's own counters and forwards them to the base. Every tracker
-     * does the same, the operation tracker included; only 'limitFigure()' tells the roles apart.
+     * Accumulates 'diff' into this tracker and propagates the exact diff up the base chain.
+     * Chunking gates the CurOp write. With '_curOpWriteChunkSize == 1' every update reports; with
+     * it larger, only a chunk boundary crossing reports. Once a report has happened, a later
+     * return to zero always reports, so CurOp is not left holding a stale value.
      */
-    MONGO_COMPILER_NOINLINE void addInternal(int64_t fullDiff, int64_t uniqueDiff);
-
+    MONGO_COMPILER_NOINLINE void addInternal(int64_t diff);
 
     /**
      * Called after the memory limit has already been checked to assert that the current usage
@@ -248,14 +225,8 @@ private:
 
     // Maximum memory consumption thus far observed for this function.
     int64_t _peakTrackedMemoryBytes = 0;
-    // Everything this tracker's scope holds, including bytes already charged at their allocation.
-    int64_t _inUseFullMemoryBytes = 0;
-    // The part of the above not already charged at its allocation. Underflow means a charge and its
-    // release resolved to different trackers.
-    int64_t _inUseUniqueMemoryBytes = 0;
-    // True only for the operation tracker, whose limit uses the unique figure so that no byte is
-    // counted twice.
-    bool _isOperationTracker = false;
+    // Tracks the current memory footprint.
+    int64_t _inUseTrackedMemoryBytes = 0;
 
     // This tracker's '_writeToCurOp' is only invoked when usage surpasses this size. Writing to
     // CurOp involves lock contention, so in performance-sensitive situations, we should set a
@@ -272,14 +243,8 @@ private:
 
     MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 
-    // The figure the limit, peak and CurOp reports use: unique for the operation tracker, else
-    // full. The two counters are never made equal; read 'inUseUniqueMemoryBytes()' for the unique.
-    int64_t limitFigure() const {
-        return _isOperationTracker ? _inUseUniqueMemoryBytes : _inUseFullMemoryBytes;
-    }
-
     // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
-    // be invoked with limitFigure() and _peakTrackedMemoryBytes. This mechanism exists
+    // be invoked with _inUseTrackedMemoryBytes and _peakTrackedMemoryBytes. This mechanism exists
     // to avoid making add() virtual, since it has been shown to have an effect on performance in
     // some cases.
     std::function<void(int64_t, int64_t)> _writeToCurOp;
@@ -290,8 +255,8 @@ private:
  * functions, which are identified by their string names. Tracks both current and highest
  * encountered memory consumption.
  *
- * It can be used directly by calling MemoryUsageTracker::add(int64_t fullDiff, int64_t uniqueDiff),
- * or by creating a dependent tracker via MemoryUsageTracker::operator[].
+ * It can be used directly by calling MemoryUsageTracker::add(int64_t diff), or by creating a
+ * dependent tracker via MemoryUsageTracker::operator[].
  *
  * Dependent tracker will update both its own memory and the total. It is used to track the
  * consumption of individual parts, such as different accumulators in $group, while simultaneously
@@ -320,10 +285,7 @@ public:
     /**
      * Sets the new total for 'name', and updates the current total memory usage.
      */
-    void set(std::string_view name, int64_t fullTotal, int64_t uniqueTotal);
-    void set(std::string_view name, int64_t total) {
-        set(name, total, total);
-    }
+    void set(std::string_view name, int64_t total);
 
     /**
      * Resets both the total memory usage as well as the per-function memory usage, but retains the
@@ -342,22 +304,16 @@ public:
     SimpleMemoryUsageTracker& operator[](std::string_view name);
 
     /**
-     * Updates the memory usage for 'name' by adding 'fullDiff' and 'uniqueDiff' to the current
-     * memory usage for that function. Also updates the total memory usage.
+     * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
+     * that function. Also updates the total memory usage.
      */
-    void add(std::string_view name, int64_t fullDiff, int64_t uniqueDiff);
-    void add(std::string_view name, int64_t diff) {
-        add(name, diff, diff);
-    }
+    void add(std::string_view name, int64_t diff);
 
     /**
      * Updates total memory usage.
      */
-    void add(int64_t fullDiff, int64_t uniqueDiff) {
-        _baseTracker.add(fullDiff, uniqueDiff);
-    }
     void add(int64_t diff) {
-        _baseTracker.add(diff, diff);
+        _baseTracker.add(diff);
     }
 
     auto inUseTrackedMemoryBytes() const {
@@ -445,21 +401,13 @@ public:
     // Default constructor is only present to support ease of use for some containers.
     MemoryUsageTokenImpl() {}
 
-    // Single-figure form: both figures are the same.
     MemoryUsageTokenImpl(size_t initial, Tracker* tracker)
-        : MemoryUsageTokenImpl(initial, tracker, initial) {}
-
-    MemoryUsageTokenImpl(size_t initialFull, Tracker* tracker, size_t initialUnique)
-        : _tracker(tracker),
-          _curMemoryUsageBytes(initialFull),
-          _curUniqueMemoryBytes(initialUnique) {
-        _tracker->add(_curMemoryUsageBytes, _curUniqueMemoryBytes);
+        : _tracker(tracker), _curMemoryUsageBytes(initial) {
+        _tracker->add(_curMemoryUsageBytes);
     }
 
     MemoryUsageTokenImpl(MemoryUsageTokenImpl&& other)
-        : _tracker(other._tracker),
-          _curMemoryUsageBytes(other._curMemoryUsageBytes),
-          _curUniqueMemoryBytes(other._curUniqueMemoryBytes) {
+        : _tracker(other._tracker), _curMemoryUsageBytes(other._curMemoryUsageBytes) {
         other._tracker = nullptr;
     }
 
@@ -471,7 +419,6 @@ public:
         releaseMemory();
         _tracker = other._tracker;
         _curMemoryUsageBytes = other._curMemoryUsageBytes;
-        _curUniqueMemoryBytes = other._curUniqueMemoryBytes;
         other._tracker = nullptr;
         return *this;
     }
@@ -484,31 +431,17 @@ public:
         return _curMemoryUsageBytes;
     }
 
-    int64_t getCurrentUniqueMemoryBytes() const {
-        return _curUniqueMemoryBytes;
-    }
-
-    void add(int64_t fullDiff, int64_t uniqueDiff) {
+    void add(int64_t diff) {
         if (!_tracker) {
             return;
         }
 
-        _curMemoryUsageBytes += fullDiff;
-        _curUniqueMemoryBytes += uniqueDiff;
-        _tracker->add(fullDiff, uniqueDiff);
-    }
-
-    void set(int64_t fullTotal, int64_t uniqueTotal) {
-        add(fullTotal - _curMemoryUsageBytes, uniqueTotal - _curUniqueMemoryBytes);
-    }
-
-    // Single-figure forms charge the same bytes to both figures.
-    void add(int64_t diff) {
-        add(diff, diff);
+        _curMemoryUsageBytes += diff;
+        _tracker->add(diff);
     }
 
     void set(int64_t total) {
-        set(total, total);
+        add(total - _curMemoryUsageBytes);
     }
 
     const Tracker* tracker() const {
@@ -522,14 +455,12 @@ public:
 protected:
     void releaseMemory() {
         if (_tracker) {
-            _tracker->add(-_curMemoryUsageBytes, -_curUniqueMemoryBytes);
+            _tracker->add(-_curMemoryUsageBytes);
         }
     }
 
     Tracker* _tracker{nullptr};
     int64_t _curMemoryUsageBytes{0};
-    // The part of '_curMemoryUsageBytes' not already charged at its allocation.
-    int64_t _curUniqueMemoryBytes{0};
 };
 
 using MemoryUsageToken = MemoryUsageTokenImpl<SimpleMemoryUsageTracker>;

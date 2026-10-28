@@ -28,9 +28,7 @@ OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx
     : SimpleMemoryUsageTracker(nullptr,
                                MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation},
                                internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()),
-      _opCtx(opCtx) {
-    setIsOperationTracker();
-}
+      _opCtx(opCtx) {}
 
 /**
  * Return the OperationMemoryUsageTracker for this operation. If we haven't yet created one, do it

@@ -14,6 +14,9 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <limits>
+#include <string>
+#include <string_view>
 
 #include <absl/strings/string_view.h>
 #include <fmt/format.h>
@@ -83,13 +86,14 @@ MemoryUsageTracker::MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
 MemoryUsageTracker::MemoryUsageTracker(bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes)
     : MemoryUsageTracker(nullptr, allowDiskUse, std::move(maxMemoryUsageBytes)) {}
 
-void MemoryUsageTracker::set(std::string_view name, int64_t fullTotal, int64_t uniqueTotal) {
-    (*this)[name].set(fullTotal, uniqueTotal);
+void MemoryUsageTracker::set(std::string_view name, int64_t total) {
+    (*this)[name].set(total);
 }
 
-void MemoryUsageTracker::add(std::string_view name, int64_t fullDiff, int64_t uniqueDiff) {
-    (*this)[name].add(fullDiff, uniqueDiff);
+void MemoryUsageTracker::add(std::string_view name, int64_t diff) {
+    (*this)[name].add(diff);
 }
+
 
 DeduplicatorReporter::DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback,
                                            int64_t serverStatusChunkSize)
@@ -98,23 +102,20 @@ DeduplicatorReporter::DeduplicatorReporter(std::function<void(int64_t, int64_t)>
         11114200, "Expected positive value for serverStatusChunkSize", _serverStatusChunkSize > 0);
 }
 
-void SimpleMemoryUsageTracker::addInternal(int64_t fullDiff, int64_t uniqueDiff) {
-    // The public 'add()' only calls internal 'addInternal()' function for non-zero diffs.
-    dassert(fullDiff != 0 || uniqueDiff != 0);
+void SimpleMemoryUsageTracker::addInternal(int64_t diff) {
+    // The public 'add()' only calls internal 'addInternal()' function for diff values != 0.
+    dassert(diff != 0);
 
-    _inUseFullMemoryBytes += fullDiff;
-    _inUseUniqueMemoryBytes += uniqueDiff;
-    if (MONGO_unlikely(_inUseFullMemoryBytes < 0)) {
-        memoryTrackingUnderflowFailed(fullDiff, _inUseFullMemoryBytes - fullDiff);
+    _inUseTrackedMemoryBytes += diff;
+    if (MONGO_unlikely(_inUseTrackedMemoryBytes < 0)) {
+        memoryTrackingUnderflowFailed(diff, _inUseTrackedMemoryBytes - diff);
     }
-    if (MONGO_unlikely(_inUseUniqueMemoryBytes < 0)) {
-        memoryTrackingUnderflowFailed(uniqueDiff, _inUseUniqueMemoryBytes - uniqueDiff);
-    }
-    const int64_t figure = limitFigure();
-    _peakTrackedMemoryBytes = std::max(_peakTrackedMemoryBytes, figure);
+    _peakTrackedMemoryBytes = std::max(_peakTrackedMemoryBytes, _inUseTrackedMemoryBytes);
 
+    // '_base' always gets the exact diff, regardless of chunking, so ancestors' totals -- and
+    // therefore limit enforcement -- are never stale.
     if (_base) {
-        _base->addInternal(fullDiff, uniqueDiff);
+        _base->addInternal(diff);
     }
 
     if (!_writeToCurOp) {
@@ -127,26 +128,27 @@ void SimpleMemoryUsageTracker::addInternal(int64_t fullDiff, int64_t uniqueDiff)
     // report either. '_lastReportedLowerBound' is -1 exactly in that "never reported" state; once a
     // report has happened it is always a non-negative multiple of '_curOpWriteChunkSize'.
     if (_lastReportedLowerBound < 0) {
-        if (figure < _curOpWriteChunkSize) {
+        if (_inUseTrackedMemoryBytes < _curOpWriteChunkSize) {
             return;
         }
     } else {
         // '_curOpWriteChunkSize' is clamped to at least 1 by the constructor, so this always
         // terminates in a report -- chunk size 1 behaves exactly like "no chunking," since
-        // 'offsetSinceLastReported' is then just the diff, which add() guarantees is non-zero.
+        // 'offsetSinceLastReported' is then just 'diff', which add() guarantees is non-zero.
         //
         // A negative offset -- usage moved below the last reported bound -- wraps to a huge
         // unsigned value, so any downward move reports immediately rather than being swallowed.
-        const int64_t offsetSinceLastReported = figure - _lastReportedLowerBound;
+        const int64_t offsetSinceLastReported = _inUseTrackedMemoryBytes - _lastReportedLowerBound;
         if (static_cast<uint64_t>(offsetSinceLastReported) <
                 static_cast<uint64_t>(_curOpWriteChunkSize) &&
-            figure != 0) {
+            _inUseTrackedMemoryBytes != 0) {
             return;
         }
     }
     reportToCurOp();
-    _lastReportedLowerBound =
-        figure == 0 ? -1 : (figure / _curOpWriteChunkSize) * _curOpWriteChunkSize;
+    _lastReportedLowerBound = _inUseTrackedMemoryBytes == 0
+        ? -1
+        : (_inUseTrackedMemoryBytes / _curOpWriteChunkSize) * _curOpWriteChunkSize;
 }
 
 // This function is often used on the hot path of memory tracking. Don't add an unnecessary stack
@@ -154,19 +156,19 @@ void SimpleMemoryUsageTracker::addInternal(int64_t fullDiff, int64_t uniqueDiff)
 // their addresses to the callback function.
 MONGO_COMPILER_NOINLINE MONGO_COMPILER_NO_STACK_PROTECTOR void
 SimpleMemoryUsageTracker::reportToCurOp() const {
-    _writeToCurOp(limitFigure(), _peakTrackedMemoryBytes);
+    _writeToCurOp(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
 }
 
 void SimpleMemoryUsageTracker::resetBase(SimpleMemoryUsageTracker* base) {
-    // Move our contribution, both figures, off the old base and onto the new one so the ancestor
-    // chain totals stay consistent. When old and new are the same object, for example the
-    // operation tracker carried across a getMore, this nets to zero.
+    // Move our contribution off the old base and onto the new one so the ancestor chain's totals
+    // stay consistent. When old and new are the same object (e.g. the operation tracker was carried
+    // across a getMore) this nets to zero rather than double-counting.
     if (_base) {
-        _base->add(-_inUseFullMemoryBytes, -_inUseUniqueMemoryBytes);
+        _base->add(-_inUseTrackedMemoryBytes);
     }
     _base = base;
     if (_base) {
-        _base->add(_inUseFullMemoryBytes, _inUseUniqueMemoryBytes);
+        _base->add(_inUseTrackedMemoryBytes);
     }
 }
 
@@ -180,9 +182,9 @@ SimpleMemoryUsageTracker SimpleMemoryUsageTracker::makeFreshSimpleMemoryUsageTra
 
 void MemoryUsageTracker::resetCurrent() {
     for (auto& [_, funcTracker] : _functionMemoryTracker) {
-        funcTracker.set(0, 0);
+        funcTracker.set(0);
     }
-    _baseTracker.set(0, 0);
+    _baseTracker.set(0);
 }
 
 void MemoryUsageTracker::clear() {
@@ -251,7 +253,7 @@ void SimpleMemoryUsageTracker::uassertedMemoryLimitExceeded(OperationContext* op
     if (!stageName.empty()) {
         msg << " Stage: " << stageName << ".";
     }
-    msg << " Needs: " << limitFigure()
+    msg << " Needs: " << _inUseTrackedMemoryBytes
         << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes.get(opCtx) << " bytes.";
     int level = 1;
     for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
