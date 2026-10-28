@@ -1,0 +1,76 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo::extension"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/extension/public/extension_privilege.idl"
+
+enums:
+    MongoExtensionCommandClusterRole:
+        description: >-
+            Where the command should be registered: on shard servers, router servers, or both.
+        type: string
+        values:
+            kShard: "shard"
+            kRouter: "router"
+            kBoth: "both"
+    MongoExtensionCommandReadWriteType:
+        description: >-
+            The read/write classification for this command.
+        type: string
+        values:
+            kRead: "read"
+            kWrite: "write"
+            kCommand: "command"
+    MongoExtensionCommandAllowedOnSecondary:
+        description: >-
+            Whether this command is allowed to run on secondary nodes.
+        type: string
+        values:
+            kAlways: "always"
+            kNever: "never"
+            kOptIn: "optIn"
+
+structs:
+    MongoExtensionCommandStaticProperties:
+        description: >-
+            Static properties of a command provided by an extension. These remain constant for the
+            lifetime of the extension and describe the command's cluster role, read/write type, and
+            other metadata.
+        strict: false
+        fields:
+            clusterRole:
+                description: Where the command should be registered (shard, router, or both).
+                type: MongoExtensionCommandClusterRole
+                default: kBoth
+            readWriteType:
+                description: The read/write classification for this command.
+                type: MongoExtensionCommandReadWriteType
+                default: kCommand
+            allowedOnSecondary:
+                description: Whether this command is allowed on secondary nodes.
+                type: MongoExtensionCommandAllowedOnSecondary
+                default: kNever
+            adminOnly:
+                description: Whether this command can only be run on the admin database.
+                type: bool
+                default: false
+            supportsWriteConcern:
+                description: Whether this command supports write concern.
+                type: bool
+                default: false
+            isSubjectToIngressAdmissionControl:
+                description: >-
+                    Whether this command should wait for ingress admission tickets before running.
+                type: bool
+                default: false
+            requiredPrivileges:
+                description: >-
+                    Privileges the client must hold to invoke this command. Each entry names action
+                    types on a resource pattern (currently the command's target namespace). An empty
+                    array means the command requires no additional privileges.
+                type: array<MongoExtensionRequiredPrivilege>

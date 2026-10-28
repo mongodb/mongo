@@ -7,6 +7,8 @@
 global:
     mod_visibility: public
     cpp_namespace: "mongo::extension"
+    cpp_includes:
+        - "mongo/db/extension/shared/extension_privilege_validator.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -51,3 +53,5 @@ structs:
             actions:
                 description: Actions required on the target.
                 type: array<MongoExtensionPrivilegeActionEntry>
+                validator:
+                    callback: "validateActionsNotEmpty"

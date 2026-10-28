@@ -336,9 +336,6 @@ public:
                         actions.addAction(static_properties_util::toActionType(entry.getAction()));
                     }
 
-                    tassert(ErrorCodes::ExtensionError,
-                            "requiredPrivileges.actions must not be empty.",
-                            !actions.empty());
                     Privilege::addPrivilegeToPrivilegeVector(
                         &privileges, Privilege{ResourcePattern::forExactNamespace(_nss), actions});
                 }

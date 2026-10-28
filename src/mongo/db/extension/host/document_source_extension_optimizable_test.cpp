@@ -1437,13 +1437,12 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
         EmptyActionsArrayRequiredPrivilegesAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
-    host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
+    // The empty-actions rule is enforced by the IDL validator on the privilege's actions field,
+    // which trips while the node's properties are parsed.
+    [[maybe_unused]] host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
         std::string(EmptyActionsArrayRequiredPrivilegesAggStageAstNode::kName),
         std::move(handle),
         _nss);
-
-    [[maybe_unused]] auto privileges =
-        lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
