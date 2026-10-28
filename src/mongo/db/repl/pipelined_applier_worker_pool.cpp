@@ -23,29 +23,24 @@
 namespace mongo::repl {
 
 std::deque<PipelinedApplierWorkerPool::Worker> PipelinedApplierWorkerPool::_startWorkers(
-    size_t numWorkers, ConsumeFn consumeFn) {
+    size_t numWorkers) {
     LOGV2(13315500, "Starting pipelined oplog applier workers", "numWorkers"_attr = numWorkers);
     std::deque<Worker> workers;
-    workers.resize(numWorkers);
-    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-        auto& worker = workers[workerIdx];
-        SerialProcessor<WorkItem>::Options opts{
-            .process = [workerIdx, &worker, consumeFn](WorkItem item) -> Status {
-                consumeFn(workerIdx, item);
-                worker.executed.fetchAndAddRelaxed(1);
-                return Status::OK();
-            },
-            .init =
-                [workerIdx] {
-                    Client::initThread(fmt::format("PipelinedApplierWorker-{}", workerIdx),
-                                       getGlobalServiceContext()->getService(),
-                                       Client::noSession(),
-                                       ClientOperationKillableByStepdown{false});
-                    AuthorizationSession::get(cc())->grantInternalAuthorization();
-                    return Status::OK();
-                },
+    for (size_t i = 0; i < numWorkers; ++i) {
+        ThreadPool::Options options;
+        options.poolName = fmt::format("PipelinedApplierWorker-{}", i);
+        options.threadNamePrefix = fmt::format("PipelinedApplierWorker-{}-", i);
+        options.minThreads = 1;
+        options.maxThreads = 1;
+        options.onCreateThread = [](const std::string& threadName) {
+            Client::initThread(threadName,
+                               getGlobalServiceContext()->getService(),
+                               Client::noSession(),
+                               ClientOperationKillableByStepdown{false});
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
         };
-        worker.processor = std::make_unique<SerialProcessor<WorkItem>>(std::move(opts));
+        workers.emplace_back(std::move(options));
+        workers.back().pool.startup();
     }
     return workers;
 }
@@ -88,8 +83,9 @@ PeriodicJobAnchor PipelinedApplierWorkerPool::_makeMetricsCollector(
 }
 
 PipelinedApplierWorkerPool::PipelinedApplierWorkerPool(size_t numWorkers, ConsumeFn consumeFn)
-    : _numWorkers(numWorkers),
-      _workers(_startWorkers(numWorkers, std::move(consumeFn))),
+    : _consumeFn(std::move(consumeFn)),
+      _numWorkers(numWorkers),
+      _workers(_startWorkers(numWorkers)),
       _metricsCollector(_makeMetricsCollector(_workers)) {
     if (_metricsCollector.isValid()) {
         _metricsCollector.start();
@@ -110,14 +106,18 @@ void PipelinedApplierWorkerPool::enqueue(size_t workerIdx, WorkItem item) {
     auto& worker = _workers[workerIdx];
     // Counted before scheduling so a report never shows more items executed than scheduled.
     worker.scheduled.fetchAndAddRelaxed(1);
-    invariant(worker.processor);
-    worker.processor->push(std::move(item));
+    worker.pool.schedule([this, workerIdx, &worker, item = std::move(item)](Status status) {
+        // A non-OK status means the item was scheduled after shutdown, which the shutdown
+        // contract forbids.
+        invariant(status);
+        _consumeFn(workerIdx, item);
+        worker.executed.fetchAndAddRelaxed(1);
+    });
 }
 
 void PipelinedApplierWorkerPool::waitForIdle() {
     for (auto& worker : _workers) {
-        invariant(worker.processor);
-        worker.processor->drain();
+        worker.pool.waitForIdle();
     }
 }
 
@@ -127,16 +127,18 @@ void PipelinedApplierWorkerPool::shutdownAndJoin() {
     }
     LOGV2(
         13315501, "Shutting down pipelined oplog applier workers", "numWorkers"_attr = _numWorkers);
-    // Wait for each worker thread to consume everything before signaling shutdown.
-    // SerialProcessor::shutdown() forces the processor's worker to stop consuming, joins the
-    // thread, and returns whatever was left in the worker's queue. Waiting for idle first ensures
-    // every worker drains its queue, so no work items will be dropped, and
-    // PipelinedApplierWorkerPool::_isShutdown ensures we don't enqueue any work items during this
-    // draining process.
+    // Wait for each worker thread to consume everything before signaling shutdown. A ThreadPool's
+    // worker stops consuming as soon as shutdown() is called, and join() drains any tasks still
+    // pending on an extra cleanup thread, which can run concurrently with the worker's in-flight
+    // task. Waiting for idle first keeps every work item's consumption on its owning worker
+    // thread, preserving per-worker serialization through shutdown. _isShutdown rejects any
+    // further enqueues, so the queues stay empty afterwards.
     waitForIdle();
     for (auto& worker : _workers) {
-        auto dropped = worker.processor->shutdown();
-        invariant(dropped.empty());
+        worker.pool.shutdown();
+    }
+    for (auto& worker : _workers) {
+        worker.pool.join();
     }
     LOGV2(13315502, "Pipelined oplog applier workers shut down");
 }
