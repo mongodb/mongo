@@ -373,7 +373,7 @@ feature_flags:
     featureFlagParallelCollectionValidation:
         description: "When enabled, collection validation will use a parallel execution model to validate records."
         cpp_varname: gFeatureFlagParallelCollectionValidation
-        default: false
+        default: true
         fcv_gated: false
     featureFlagBatchedContainerWrites:
         description: "When enabled, allows a batched container write format to support compact oplog entries."

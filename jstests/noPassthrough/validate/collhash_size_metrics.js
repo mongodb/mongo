@@ -13,7 +13,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_wiredtiger,
- *   featureFlagParallelCollectionValidation_incompatible,
  * ]
  */
 
