@@ -29,6 +29,98 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalLookupStageResultCacheMaxEntries:
+        description: >-
+            Maximum number of entries in the LRU cache that the classic $lookup stage uses to
+            reuse foreign query results for repeated localField values. A value of 0 disables the
+            cache entirely (it is never constructed).
+        set_at: [startup, runtime]
+        cpp_varname: "internalLookupStageResultCacheMaxEntries"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 5
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageResultCacheMaxEntries
+
+    internalLookupStageResultCacheMaxEntrySizeBytes:
+        description: >-
+            Maximum size in bytes of a single cached entry in the classic $lookup result cache
+            (see internalLookupStageResultCacheMaxEntries). Foreign query results larger
+            than this are never cached. A value of 0 disables the cache entirely (it is never
+            constructed).
+        set_at: [startup, runtime]
+        cpp_varname: "internalLookupStageResultCacheMaxEntrySizeBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 10 * 1024
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageResultCacheMaxEntrySizeBytes
+
+    internalLookupStageResultCacheWarmupSize:
+        description: >-
+            Number of localField values the classic $lookup result cache observes before deciding
+            whether to keep caching. After this many lookups, if the observed hit rate is below
+            internalLookupStageResultCacheMinHitPercent the cache disables itself for the remainder
+            of the query to avoid per-document overhead on workloads it cannot help. A value of 0
+            disables this adaptive backoff (the cache always stays enabled).
+        set_at: [startup, runtime]
+        cpp_varname: "internalLookupStageResultCacheWarmupSize"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 1000
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageResultCacheWarmupSize
+
+    internalLookupStageResultCacheMinHitPercent:
+        description: >-
+            Minimum cache hit rate, as a percentage (0-100), that the classic $lookup result cache
+            must observe over its warmup window (internalLookupStageResultCacheWarmupSize) to remain
+            enabled. Below this the cache disables itself for the remainder of the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalLookupStageResultCacheMinHitPercent"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 10
+        validator:
+            gte: 0
+            lte: 100
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageResultCacheMinHitPercent
+
+    internalLookupStageResultCacheFastBailoutMisses:
+        description: >-
+            Number of consecutive misses with no intervening hit that cause the classic $lookup
+            result cache to disable itself immediately, independent of
+            internalLookupStageResultCacheWarmupSize. Exists to automatically disable the cache
+            faster than internalLookupStageResultCacheWarmupSize/internalLookupStageResultCacheMinHitPercent
+            when the number of lookups is less than or close to the warm up set size. A value of 0
+            disables this fast path.
+        set_at: [startup, runtime]
+        cpp_varname: "internalLookupStageResultCacheFastBailoutMisses"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 20
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageResultCacheFastBailoutMisses
+
     internalDocumentSourceGraphLookupMaxMemoryBytes:
         description: >-
             Maximum size of the data that the $graphLookup aggregation stage will cache

@@ -10,6 +10,7 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {setParametersOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const kDbName = jsTestName();
 const kForeignDocs = [
@@ -111,22 +112,47 @@ function* generateLookups() {
     }
 }
 
+// We'll run the $lookups with various parameters set, to make sure it works with the cache off, on, and with
+// non-default values.
+function* lookupCacheFlagValues() {
+    for (const internalLookupStageResultCacheMaxEntries of [0, 5]) {
+        for (const internalLookupStageResultCacheWarmupSize of [0, 2, 1000]) {
+            for (const internalLookupStageResultCacheFastBailoutMisses of [0, 1, 20]) {
+                yield {
+                    internalLookupStageResultCacheMaxEntries,
+                    internalLookupStageResultCacheWarmupSize,
+                    internalLookupStageResultCacheFastBailoutMisses,
+                };
+            }
+        }
+    }
+}
+
 // Runs all lookup combinations against the given db.
 function runAllCombinationsAgainstDb(db, debugInfo) {
-    for (const {foreignNs, lookup} of generateLookups()) {
-        const pipeline = [lookup, {$project: {_id: 0, join_key: 1, join_result: 1}}];
+    for (const flags of lookupCacheFlagValues()) {
+        setParametersOnAllNonConfigNodes(db.getMongo(), flags);
+        const flagDebugInfo = {...debugInfo, flags};
 
-        // Test the $lookup ran at the top-level.
-        const debugInfoTopLevel = {...debugInfo, pipeline};
-        assertCorrectResult(db.local.aggregate(pipeline).toArray(), foreignNs, debugInfoTopLevel);
+        for (const {foreignNs, lookup} of generateLookups()) {
+            const pipeline = [lookup, {$project: {_id: 0, join_key: 1, join_result: 1}}];
 
-        // Test the $lookup ran as a subpipeline for another $lookup, and check that
-        // the doc nested inside the top-level result is what we expect.
-        const nestedPipeline = [{$limit: 1}, {$lookup: {from: "local", pipeline, as: "n"}}];
-        const debugInfoNested = {...debugInfo, pipeline: nestedPipeline};
-        const res = db.driver.aggregate(nestedPipeline).toArray();
-        assert.eq(res.length, 1, {res});
-        assertCorrectResult(res[0].n, foreignNs, debugInfoNested);
+            // Test the $lookup ran at the top-level.
+            const debugInfoTopLevel = {...flagDebugInfo, pipeline};
+            assertCorrectResult(
+                db.local.aggregate(pipeline).toArray(),
+                foreignNs,
+                debugInfoTopLevel,
+            );
+
+            // Test the $lookup ran as a subpipeline for another $lookup, and check that
+            // the doc nested inside the top-level result is what we expect.
+            const nestedPipeline = [{$limit: 1}, {$lookup: {from: "local", pipeline, as: "n"}}];
+            const debugInfoNested = {...flagDebugInfo, pipeline: nestedPipeline};
+            const res = db.driver.aggregate(nestedPipeline).toArray();
+            assert.eq(res.length, 1, {res});
+            assertCorrectResult(res[0].n, foreignNs, debugInfoNested);
+        }
     }
 }
 
@@ -134,6 +160,15 @@ function testStandalone() {
     const conn = MongoRunner.runMongod();
     try {
         const db = conn.getDB(kDbName);
+
+        // This test runs many combinations of topologies and lookup shapes, which is
+        // slow on debug builds.
+        if (isSlowBuild(db)) {
+            jsTest.log.info("Aborting test since it's running on a slow build");
+            MongoRunner.stopMongod(conn);
+            quit();
+        }
+
         setUpCollections(db);
         runAllCombinationsAgainstDb(db);
     } finally {
@@ -151,12 +186,6 @@ function testShardedScenarios() {
             st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
         );
         const db = st.s.getDB(kDbName);
-        if (isSlowBuild(db)) {
-            // This part of the test runs combinations of topologies and lookup shapes which could
-            // be slow on debug builds.
-            jsTest.log.info("Skipping " + jsTestName() + " sharded scenarios on slow builds.");
-            return;
-        }
         const topologies = makeTopologies(st);
 
         // Iterate through combinations of local/foreign topologies, and assert

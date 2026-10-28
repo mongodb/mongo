@@ -10,6 +10,11 @@ namespace mongo {
 
 enum class [[MONGO_MOD_PARENT_PRIVATE]] StageMemoryLimit {
     DocumentSourceLookupCacheSizeBytes,
+    LookupStageResultCacheMaxEntries,
+    LookupStageResultCacheMaxEntrySizeBytes,
+    LookupStageResultCacheWarmupSize,
+    LookupStageResultCacheMinHitPercent,
+    LookupStageResultCacheFastBailoutMisses,
     DocumentSourceGraphLookupMaxMemoryBytes,
     DocumentSourceGroupMaxMemoryBytes,
     DocumentSourceSetWindowFieldsMaxMemoryBytes,

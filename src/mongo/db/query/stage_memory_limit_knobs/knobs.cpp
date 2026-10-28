@@ -14,6 +14,16 @@ const QueryKnob<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
     switch (stage) {
         case StageMemoryLimit::DocumentSourceLookupCacheSizeBytes:
             return query_knobs::kDocumentSourceLookupCacheSizeBytes;
+        case StageMemoryLimit::LookupStageResultCacheMaxEntries:
+            return query_knobs::kLookupStageResultCacheMaxEntries;
+        case StageMemoryLimit::LookupStageResultCacheMaxEntrySizeBytes:
+            return query_knobs::kLookupStageResultCacheMaxEntrySizeBytes;
+        case StageMemoryLimit::LookupStageResultCacheWarmupSize:
+            return query_knobs::kLookupStageResultCacheWarmupSize;
+        case StageMemoryLimit::LookupStageResultCacheMinHitPercent:
+            return query_knobs::kLookupStageResultCacheMinHitPercent;
+        case StageMemoryLimit::LookupStageResultCacheFastBailoutMisses:
+            return query_knobs::kLookupStageResultCacheFastBailoutMisses;
         case StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes:
             return query_knobs::kDocumentSourceGraphLookupMaxMemoryBytes;
         case StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes:

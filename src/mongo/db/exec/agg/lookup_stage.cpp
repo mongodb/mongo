@@ -39,6 +39,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceLookUpToStageFn(
         lookupDS->getExpCtx(),
         lookupDS->getSubpipelineExpCtx(),
         lookupDS->getFromNs(),
+        lookupDS->_fromNsIsAView,
         lookupDS->getAsField(),
         lookupDS->getLocalField(),
         lookupDS->getForeignField(),
@@ -115,6 +116,7 @@ LookUpStage::LookUpStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          boost::intrusive_ptr<ExpressionContext> fromExpCtx,
                          NamespaceString fromNs,
+                         bool fromNsIsAView,
                          FieldPath as,
                          boost::optional<FieldPath> localField,
                          boost::optional<FieldPath> foreignField,
@@ -131,6 +133,7 @@ LookUpStage::LookUpStage(std::string_view stageName,
     : Stage(stageName, pExpCtx),
       _fromExpCtx(std::move(fromExpCtx)),
       _fromNs(std::move(fromNs)),
+      _fromNsIsAView(fromNsIsAView),
       _as(std::move(as)),
       _localField(std::move(localField)),
       _foreignField(std::move(foreignField)),
@@ -144,8 +147,8 @@ LookUpStage::LookUpStage(std::string_view stageName,
       _unwindPreserveNullsAndEmptyArrays(unwindPreserveNullsAndEmptyArrays),
       _additionalFilter(additionalFilter.getOwned()),
       _sharedState(std::move(sharedState)),
-      _memoryTracker(
-          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)),
+      _resultCache(makeResultCache(pExpCtx, hasUserPipeline)) {
     if (!hasLocalFieldForeignFieldJoin()) {
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
@@ -153,12 +156,65 @@ LookUpStage::LookUpStage(std::string_view stageName,
         _cache = std::make_shared<SequentialDocumentCache>(
             loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes)
                 .get(pExpCtx->getOperationContext()));
+        // TODO SERVER-132796: extend the result cache above to cover $lookup that has absorbed a
+        // $unwind.
     }
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
         _expressionEvalCtx.tracker = &_memoryTracker;
     }
     _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
+}
+
+LookupResultCache LookUpStage::makeResultCache(
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx, bool hasUserPipeline) {
+    // Use the result cache when:
+    //   - We have a pure local/foreignField join with no let variables or pipeline, so foreign
+    //     results for a given localField value never changes.
+    //   - The `from` namespace is not a view, since the view definition could be non-deterministic.
+    //        - View resolution is only done at parse-time when
+    //          `featureFlagExtensionsInsideHybridSearch` is on. We gate on this flag for that
+    //          reason.
+    //   - The $lookup has not absorbed an $unwind (the cache does not implement this case yet).
+    //   - The operation is not in a multi-document transaction, where a cached result could
+    //     predate the transaction's own later writes to the foreign collection.
+    //   - The stage is not executing on a router.
+    //   - An optimized build is being used. This way we can maintain coverage of $lookup without
+    //     the cache when kDebugBuild=true.
+    auto ifrCtx = pExpCtx->getIfrContext();
+    const bool hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    auto* opCtx = pExpCtx->getOperationContext();
+    const bool inMultiDocumentTransaction = opCtx && opCtx->inMultiDocumentTransaction();
+    if (!hasLocalFieldForeignFieldJoin() || hasUserPipeline || !_letVariables.empty() ||
+        _hasAbsorbedUnwindSrc || !hybridSearchFlagEnabled || _fromNsIsAView ||
+        inMultiDocumentTransaction || pExpCtx->getInRouter() || kDebugBuild) {
+        return LookupResultCache::createDisabled();
+    }
+
+    const auto maxEntries =
+        static_cast<size_t>(loadMemoryLimit(StageMemoryLimit::LookupStageResultCacheMaxEntries)
+                                .get(pExpCtx->getOperationContext()));
+    const auto maxEntrySizeBytes = static_cast<size_t>(
+        loadMemoryLimit(StageMemoryLimit::LookupStageResultCacheMaxEntrySizeBytes)
+            .get(pExpCtx->getOperationContext()));
+    // A cache with no room for any entry is never usable; skip constructing a real one.
+    if (maxEntries == 0 || maxEntrySizeBytes == 0) {
+        return LookupResultCache::createDisabled();
+    }
+
+    return LookupResultCache(
+        _fromExpCtx->getValueComparator(),
+        &_memoryTracker,
+        maxEntries,
+        maxEntrySizeBytes,
+        static_cast<size_t>(loadMemoryLimit(StageMemoryLimit::LookupStageResultCacheWarmupSize)
+                                .get(pExpCtx->getOperationContext())),
+        static_cast<size_t>(loadMemoryLimit(StageMemoryLimit::LookupStageResultCacheMinHitPercent)
+                                .get(pExpCtx->getOperationContext())),
+        static_cast<size_t>(
+            loadMemoryLimit(StageMemoryLimit::LookupStageResultCacheFastBailoutMisses)
+                .get(pExpCtx->getOperationContext())));
 }
 
 void LookUpStage::detachFromOperationContext() {
@@ -262,6 +318,17 @@ GetNextResult LookUpStage::doGetNext() {
 
     auto inputDoc = nextInput.releaseDocument();
 
+    // computeKey() internally checks isEnabled() before touching '_localField' (safe even when
+    // '_localField' is unset, since the cache is guaranteed disabled in that case), so no separate
+    // enabled-check is needed here.
+    boost::optional<Value> resultCacheKey = _resultCache.computeKey(inputDoc, _localField);
+    if (resultCacheKey) {
+        if (auto cached = _resultCache.get(*resultCacheKey)) {
+            MutableDocument output(std::move(inputDoc));
+            output.setNestedField(_as, *cached);
+            return output.freeze();
+        }
+    }
 
     std::unique_ptr<mongo::Pipeline> pipeline;
     std::unique_ptr<Pipeline> execPipeline;
@@ -304,8 +371,17 @@ GetNextResult LookUpStage::doGetNext() {
 
     _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || execPipeline->usedDisk();
 
+    // Wrap the results in a Value once, up front, so that both the cache entry and the output
+    // document can share it via cheap Value copies (refcount bumps) instead of each requiring an
+    // independent O(N) copy/move of the underlying vector.
+    Value resultsAsValue(std::move(results));
+
+    if (resultCacheKey && _resultCache.isEnabled()) {
+        _resultCache.put(*resultCacheKey, resultsAsValue, static_cast<size_t>(objsize));
+    }
+
     MutableDocument output(std::move(inputDoc));
-    output.setNestedField(_as, Value(std::move(results)));
+    output.setNestedField(_as, std::move(resultsAsValue));
     return output.freeze();
 }
 
@@ -319,6 +395,7 @@ void LookUpStage::doDispose() {
     if (_sharedState->pipeline) {
         _sharedState->pipeline.reset();
     }
+    _resultCache.disable();
 }
 
 std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
@@ -328,6 +405,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     bool attachCursorAfterOptimizing,
     ShardTargetingPolicy shardTargetingPolicy,
     std::function<void(mongo::Pipeline* pipeline)> optimizePipeline) {
+    // If we find we're querying against a view, disable the result cache.
+    _resultCache.disable();
 
     // We don't want to optimize or attach a cursor source here because we need to update
     // _sharedState->resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we

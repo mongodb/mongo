@@ -78,6 +78,26 @@ export function isSlowBuild(db) {
 }
 
 /**
+ * Returns true if the $lookup result cache is enabled.
+ */
+export function isLookupResultCacheEnabled(db) {
+    if (db.getServerBuildInfo().isDebug()) {
+        return false;
+    }
+    const params = assert.commandWorked(
+        db.adminCommand({
+            getParameter: 1,
+            internalLookupStageResultCacheMaxEntries: 1,
+            internalLookupStageResultCacheMaxEntrySizeBytes: 1,
+        }),
+    );
+    return (
+        params.internalLookupStageResultCacheMaxEntries > 0 &&
+        params.internalLookupStageResultCacheMaxEntrySizeBytes > 0
+    );
+}
+
+/**
  * Returns true if resmoke.py was called with --runAllFeatureFlagTests.
  */
 

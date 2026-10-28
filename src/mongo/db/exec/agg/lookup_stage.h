@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/lookup_result_cache.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -41,6 +42,7 @@ public:
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 boost::intrusive_ptr<ExpressionContext> fromExpCtx,
                 NamespaceString fromNs,
+                bool fromNsIsAView,
                 FieldPath as,
                 boost::optional<FieldPath> localField,
                 boost::optional<FieldPath> foreignField,
@@ -95,6 +97,22 @@ public:
      */
     void reInitializeCache_forTest(size_t maxCacheSizeBytes);
 
+    bool resultCacheEnabled_forTest() const {
+        return _resultCache.isEnabled();
+    }
+
+    size_t resultCacheSize_forTest() const {
+        return _resultCache.size();
+    }
+
+    bool resultCacheHasKey_forTest(const Value& key) const {
+        return _resultCache.hasKey(key);
+    }
+
+    int64_t memoryTrackerBytes_forTest() const {
+        return _memoryTracker.inUseTrackedMemoryBytes();
+    }
+
 private:
     GetNextResult doGetNext() final;
 
@@ -124,6 +142,16 @@ private:
     }
 
     /**
+     * Returns the LRU result cache for this stage: enabled if this is a pure localField/
+     * foreignField equijoin (no pipeline, no 'let' vars, no view target, no absorbed $unwind) with
+     * a non-zero size configuration, otherwise pre-disabled (see
+     * LookupResultCache::createDisabled()). Called from the constructor's initializer list, so it
+     * may only read members declared (and thus already initialized) before '_resultCache'.
+     */
+    LookupResultCache makeResultCache(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                      bool hasUserPipeline);
+
+    /**
      * Returns true if we are not in a transaction.
      */
     bool foreignShardedLookupAllowed() const;
@@ -141,6 +169,8 @@ private:
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
     NamespaceString _fromNs;
+    // Indicates if the `from` namespace is a view.
+    bool _fromNsIsAView;
 
     // Path to the "as" field of the $lookup where the matches output array will be created.
     FieldPath _as;
@@ -195,6 +225,12 @@ private:
     // time we hit EOF, subsequent iterations of the pipeline will draw from the cache rather than
     // from a cursor source.
     std::shared_ptr<SequentialDocumentCache> _cache;
+
+    // An LRU cache from localField value to foreign query results, used to avoid re-running the
+    // foreign query for repeated values. Always constructed, but pre-disabled (isEnabled() ==
+    // false) for a $lookup that isn't eligible for a pure equijoin cache (e.g. a pipeline, 'let'
+    // variables, a view target, or an absorbed $unwind).
+    LookupResultCache _resultCache;
 };
 
 }  // namespace mongo::exec::agg

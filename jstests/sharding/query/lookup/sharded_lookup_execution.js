@@ -11,6 +11,9 @@
  *    requires_fcv_81,
  *    # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
  *    requires_profiling,
+ *    # The exact query/local-read counts asserted here depend on the classic $lookup result
+ *    # cache, which an old-binary shard below FCV 9.1 won't have.
+ *    requires_fcv_91,
  * ]
  */
 
@@ -20,6 +23,7 @@ import {
     profilerHasNumMatchingEntriesOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {isLookupResultCacheEnabled} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
@@ -1026,6 +1030,9 @@ expectedRes = [
     {_id: 1, item: "bowl", reviews: [{stars: 4}]},
 ];
 
+// The $lookup result cache affects the number of executions.
+const resultCacheEnabled = isLookupResultCacheEnabled(st.shard0.getDB(testName));
+
 assertLookupExecution(
     pipeline,
     {comment: "sharded_to_unsharded"},
@@ -1036,8 +1043,8 @@ assertLookupExecution(
         toplevelExec: [1, 0],
         // Since it is unsharded, the foreign collection exists on the primary shard where the $lookup
         // is executing. So, the $lookup can perform local reads into the foreign collection to execute
-        // the subpipelines.
-        subpipelineLocalExec: [4, 0],
+        // the subpipelines. The repeated "shirt" value is served from the localField result cache.
+        subpipelineLocalExec: [resultCacheEnabled ? 3 : 4, 0],
         subpipelineExec: [0, 0],
     },
 );
@@ -1091,8 +1098,8 @@ assertLookupExecution(
         toplevelExec: [1, 0],
         // For every document that flows through the $lookup stage, the node executing the $lookup will
         // perform a scatter-gather query and open a cursor on every shard that contains the foreign
-        // collection.
-        subpipelineExec: [4, 4],
+        // collection. The repeated "shirt" value is served from the localField result cache.
+        subpipelineExec: resultCacheEnabled ? [3, 3] : [4, 4],
     },
 );
 

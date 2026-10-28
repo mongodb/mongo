@@ -26,3 +26,4 @@ executor:
         enableTestCommands: 1
         failpoint.disablePipelineOptimization:
           mode: alwaysOn
+        internalLookupStageResultCacheMaxEntries: 0

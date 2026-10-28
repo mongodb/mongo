@@ -17,6 +17,26 @@
          kInternalDocumentSourceLookupCacheSizeBytesName,                                 \
          internalDocumentSourceLookupCacheSizeBytes,                                      \
          getDocumentSourceLookupCacheSizeBytes)                                           \
+    KNOB(kLookupStageResultCacheMaxEntries,                                               \
+         kInternalLookupStageResultCacheMaxEntriesName,                                   \
+         internalLookupStageResultCacheMaxEntries,                                        \
+         getLookupStageResultCacheMaxEntries)                                             \
+    KNOB(kLookupStageResultCacheMaxEntrySizeBytes,                                        \
+         kInternalLookupStageResultCacheMaxEntrySizeBytesName,                            \
+         internalLookupStageResultCacheMaxEntrySizeBytes,                                 \
+         getLookupStageResultCacheMaxEntrySizeBytes)                                      \
+    KNOB(kLookupStageResultCacheWarmupSize,                                               \
+         kInternalLookupStageResultCacheWarmupSizeName,                                   \
+         internalLookupStageResultCacheWarmupSize,                                        \
+         getLookupStageResultCacheWarmupSize)                                             \
+    KNOB(kLookupStageResultCacheMinHitPercent,                                            \
+         kInternalLookupStageResultCacheMinHitPercentName,                                \
+         internalLookupStageResultCacheMinHitPercent,                                     \
+         getLookupStageResultCacheMinHitPercent)                                          \
+    KNOB(kLookupStageResultCacheFastBailoutMisses,                                        \
+         kInternalLookupStageResultCacheFastBailoutMissesName,                            \
+         internalLookupStageResultCacheFastBailoutMisses,                                 \
+         getLookupStageResultCacheFastBailoutMisses)                                      \
     KNOB(kDocumentSourceGraphLookupMaxMemoryBytes,                                        \
          kInternalDocumentSourceGraphLookupMaxMemoryBytesName,                            \
          internalDocumentSourceGraphLookupMaxMemoryBytes,                                 \

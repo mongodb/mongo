@@ -514,6 +514,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:list_local_sessions_stage.cpp",
         "//src/mongo/db/exec/agg:list_mql_entities_stage.cpp",
         "//src/mongo/db/exec/agg:list_sampled_queries_stage.cpp",
+        "//src/mongo/db/exec/agg:lookup_result_cache.cpp",
         "//src/mongo/db/exec/agg:lookup_stage.cpp",
         "//src/mongo/db/exec/agg:match_stage.cpp",
         "//src/mongo/db/exec/agg:merge_stage.cpp",

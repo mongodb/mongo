@@ -39,6 +39,11 @@ const expectedParamDefaults = {
     internalDocumentSourceCursorInitialBatchSize: 32,
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
+    internalLookupStageResultCacheMaxEntries: 5,
+    internalLookupStageResultCacheMaxEntrySizeBytes: 10 * 1024,
+    internalLookupStageResultCacheWarmupSize: 1000,
+    internalLookupStageResultCacheMinHitPercent: 10,
+    internalLookupStageResultCacheFastBailoutMisses: 20,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 100 * 1024 * 1024,
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
@@ -250,6 +255,27 @@ assertSetParameterFails("internalDocumentSourceCursorInitialBatchSize", -1);
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 11);
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 0);
 assertSetParameterFails("internalDocumentSourceLookupCacheSizeBytes", -1);
+
+assertSetParameterSucceeds("internalLookupStageResultCacheMaxEntries", 11);
+assertSetParameterSucceeds("internalLookupStageResultCacheMaxEntries", 0);
+assertSetParameterFails("internalLookupStageResultCacheMaxEntries", -1);
+
+assertSetParameterSucceeds("internalLookupStageResultCacheMaxEntrySizeBytes", 11);
+assertSetParameterSucceeds("internalLookupStageResultCacheMaxEntrySizeBytes", 0);
+assertSetParameterFails("internalLookupStageResultCacheMaxEntrySizeBytes", -1);
+
+assertSetParameterSucceeds("internalLookupStageResultCacheWarmupSize", 5000);
+assertSetParameterSucceeds("internalLookupStageResultCacheWarmupSize", 0);
+assertSetParameterFails("internalLookupStageResultCacheWarmupSize", -1);
+
+assertSetParameterSucceeds("internalLookupStageResultCacheMinHitPercent", 0);
+assertSetParameterSucceeds("internalLookupStageResultCacheMinHitPercent", 100);
+assertSetParameterFails("internalLookupStageResultCacheMinHitPercent", -1);
+assertSetParameterFails("internalLookupStageResultCacheMinHitPercent", 101);
+
+assertSetParameterSucceeds("internalLookupStageResultCacheFastBailoutMisses", 50);
+assertSetParameterSucceeds("internalLookupStageResultCacheFastBailoutMisses", 0);
+assertSetParameterFails("internalLookupStageResultCacheFastBailoutMisses", -1);
 
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 1001);
 assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 0);
