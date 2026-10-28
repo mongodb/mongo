@@ -8,7 +8,9 @@
  *   3. Concurrent user-initiated writes (insert, delete, update) on the migrating range during an
  *      active migration
  *
- * @tags: [requires_fcv_90]
+ * Migration batch inserts are marked isInternal, while the concurrent user writes are not.
+ *
+ * @tags: [requires_fcv_91]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -112,6 +114,14 @@ describe("query stats chunk migration", function () {
             kDocs.length,
             "nInserted should equal the number of migrated documents",
             {totalInserted, expected: kDocs.length},
+        );
+
+        // Migration batch inserts are work owned by chunk migration, so they are marked internal.
+        assert.eq(
+            entries[0].key.isInternal,
+            true,
+            "Migration batch insert entry should be marked isInternal",
+            {entry: entries[0]},
         );
     });
 
@@ -227,6 +237,13 @@ describe("query stats chunk migration", function () {
             "Expected exactly 1 insert recorded",
             {insertEntries},
         );
+        // User writes routed through mongos must not be marked internal.
+        assert.eq(
+            insertEntries[0].key.isInternal,
+            undefined,
+            "User insert entry should NOT be marked isInternal",
+            {entry: insertEntries[0]},
+        );
 
         const deleteEntries = getQueryStatsDeleteCmd(st.shard0, {collName});
         assert.eq(
@@ -240,6 +257,12 @@ describe("query stats chunk migration", function () {
             1,
             "Expected exactly 1 delete recorded",
             {deleteEntries},
+        );
+        assert.eq(
+            deleteEntries[0].key.isInternal,
+            undefined,
+            "User delete entry should NOT be marked isInternal",
+            {entry: deleteEntries[0]},
         );
         assert.docEq(
             deleteEntries[0].key.queryShape,
@@ -264,6 +287,12 @@ describe("query stats chunk migration", function () {
             1,
             "Expected exactly 1 update recorded",
             {updateEntries},
+        );
+        assert.eq(
+            updateEntries[0].key.isInternal,
+            undefined,
+            "User update entry should NOT be marked isInternal",
+            {entry: updateEntries[0]},
         );
         assert.docEq(
             updateEntries[0].key.queryShape,

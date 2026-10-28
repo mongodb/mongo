@@ -23,6 +23,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -124,6 +125,8 @@ void MigrationBatchInserter::run(Status status) const try {
         cc().makeOperationContext(), _innerOpCtx->getCancellationToken(), executor);
 
     auto opCtx = applicationOpCtx.get();
+
+    markInternalOperation(opCtx);
 
     // Chunk migration cloning must proceed even while replica set writes are blocked.
     ReplicaSetWriteBlockBypass::get(opCtx).set(true);
