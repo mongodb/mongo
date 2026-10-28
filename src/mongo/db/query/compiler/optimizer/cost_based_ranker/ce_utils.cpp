@@ -101,6 +101,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
         case STAGE_INDEX_PROBE_NODE:
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_EXCHANGE:
         case STAGE_MATCH:
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:
@@ -159,6 +160,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
         case STAGE_INDEX_PROBE_NODE:
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_EXCHANGE:
         case STAGE_MATCH:
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:

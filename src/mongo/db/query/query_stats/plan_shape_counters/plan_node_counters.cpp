@@ -144,6 +144,7 @@ void QsnNodeCountAnalyzer::preVisit(const QuerySolutionNode& node) {
         // until it's given a counter or explicitly listed as uncounted.
         // If you are adding a new node type and would like it to be counted, add a new counter
         // to QsnNodeCounter. Otherwise, please add it to this list as an untracked type.
+        case STAGE_EXCHANGE:
         case STAGE_BATCHED_DELETE:
         case STAGE_BATCHED_FETCH:
         case STAGE_CACHED_PLAN:

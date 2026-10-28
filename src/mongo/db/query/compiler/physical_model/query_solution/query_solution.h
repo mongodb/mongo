@@ -23,6 +23,7 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/distribution_desc.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/index_hint.h"
@@ -316,6 +317,15 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
     bool hitScanLimit = false;
 
     /**
+     * Physical properties computed by the parallel planner.
+     */
+    struct PhysicalProps {
+        DistributionDesc distribution = DistributionDesc::unpartitioned();
+    };
+
+    PhysicalProps physicalProps;
+
+    /**
      * Returns a pair consisting of:
      *  - First node of the specified type found by pre-order traversal. If node was not found, this
      *    pair element is nullptr.
@@ -356,6 +366,7 @@ protected:
         if (nullptr != this->filter) {
             other->filter = this->filter->clone();
         }
+        other->physicalProps = this->physicalProps;
     }
 
     bool eligibleForPlanCache = true;
@@ -2208,12 +2219,14 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final {
-        return std::make_unique<UnpackTsBucketNode>(children[0]->clone(),
-                                                    bucketSpec,
-                                                    eventFilter ? eventFilter->clone() : nullptr,
-                                                    wholeBucketFilter ? wholeBucketFilter->clone()
-                                                                      : nullptr,
-                                                    includeMeta);
+        auto copy = std::make_unique<UnpackTsBucketNode>(
+            children[0]->clone(),
+            bucketSpec,
+            eventFilter ? eventFilter->clone() : nullptr,
+            wholeBucketFilter ? wholeBucketFilter->clone() : nullptr,
+            includeMeta);
+        copy->physicalProps = physicalProps;
+        return copy;
     }
 
     bool metadataExhausted() const final {
@@ -2430,5 +2443,57 @@ struct IndexProbeNode : public QuerySolutionNode {
  * nullptr.
  */
 std::unique_ptr<MatchExpression>* getGeoNearDocFilter(QuerySolutionNode& node);
+
+/**
+ * Moves rows between workers based on the input routing strategy. This is the only node in a
+ * QuerySolution tree that crosses a parallelism boundary.
+ */
+struct ExchangeNode : public QuerySolutionNode {
+    ExchangeNode(std::unique_ptr<QuerySolutionNode> child, ExchangeRouting routing)
+        : QuerySolutionNode(std::move(child)), routing(std::move(routing)) {
+        // The routing determines the output distribution, so keep the two consistent from the
+        // start.
+        physicalProps.distribution = toOutputDistribution(this->routing);
+    }
+
+    ExchangeNode(const ExchangeNode& other);
+
+    StageType getType() const override {
+        return STAGE_EXCHANGE;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const override {
+        // An exchange only moves rows between workers; it never touches the record itself, so
+        // whatever the child guarantees about its data still holds above the exchange.
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const override {
+        return children[0]->getFieldAvailability(field);
+    }
+
+    bool sortedByDiskLoc() const override {
+        // Asks whether output order matches on-disk order. Once rows have crossed a worker boundary
+        // that correspondence is gone, regardless of sortPreserving.
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const override {
+        // A gather preserves the common input order only if it was built as a sort-preserving
+        // merge. Repartition and other routing types destroy the ordering.
+        const auto* gather = std::get_if<ExchangeRouting::Gather>(&routing.mode);
+        return (gather && gather->sortPreserving) ? children[0]->providedSorts() : kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    bool isGather() const {
+        return std::holds_alternative<ExchangeRouting::Gather>(routing.mode);
+    }
+
+    ExchangeRouting routing;
+};
 
 }  // namespace mongo

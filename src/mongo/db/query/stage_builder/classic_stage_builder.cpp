@@ -550,6 +550,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_DELETE:
             case STAGE_EQ_LOOKUP:
             case STAGE_EQ_LOOKUP_UNWIND:
+            case STAGE_EXCHANGE:
             case STAGE_GROUP:
             case STAGE_STREAMING_GROUP:
             case STAGE_IDHACK:

@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "query_solution",
     srcs = [
+        "distribution_desc.cpp",
         "query_solution.cpp",
         "stage_types.cpp",
     ],

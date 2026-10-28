@@ -122,6 +122,8 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief
             return "UPDATE"sv;
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
             return brief ? "HJ"sv : "HASH_JOIN_EMBEDDING"sv;
+        case STAGE_EXCHANGE:
+            return "EXCHANGE"sv;
         case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
             return brief ? "NLJ"sv : "NESTED_LOOP_JOIN_EMBEDDING"sv;
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:

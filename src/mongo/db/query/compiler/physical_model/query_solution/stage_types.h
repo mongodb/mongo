@@ -125,6 +125,9 @@ enum [[MONGO_MOD_NEEDS_REPLACEMENT]] StageType {
     STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE,
     STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE,
     STAGE_INDEX_PROBE_NODE,
+
+    // Parallelism planner stages.
+    STAGE_EXCHANGE,
     // Stage for the DocumentSource to unpack timeseries buckets.
     STAGE_UNPACK_TS_BUCKET,
 };

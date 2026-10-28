@@ -23,6 +23,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 
 #include <algorithm>
+#include <functional>
 #include <queue>
 #include <string_view>
 #include <tuple>
@@ -1361,7 +1362,10 @@ void ReturnKeyNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> ReturnKeyNode::clone() const {
-    return std::make_unique<ReturnKeyNode>(children[0]->clone(), std::vector(sortKeyMetaFields));
+    auto copy =
+        std::make_unique<ReturnKeyNode>(children[0]->clone(), std::vector(sortKeyMetaFields));
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 //
@@ -1385,7 +1389,10 @@ void MatchNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> MatchNode::clone() const {
-    return std::make_unique<MatchNode>(children[0]->clone(), filter ? filter->clone() : nullptr);
+    auto copy =
+        std::make_unique<MatchNode>(children[0]->clone(), filter ? filter->clone() : nullptr);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 //
@@ -1409,7 +1416,9 @@ void UnwindNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> UnwindNode::clone() const {
-    return std::make_unique<UnwindNode>(children[0]->clone(), spec);
+    auto copy = std::make_unique<UnwindNode>(children[0]->clone(), spec);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 //
@@ -1432,7 +1441,10 @@ void ReplaceRootNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> ReplaceRootNode::clone() const {
-    return std::make_unique<ReplaceRootNode>(children[0]->clone(), newRoot ? newRoot : nullptr);
+    auto copy =
+        std::make_unique<ReplaceRootNode>(children[0]->clone(), newRoot ? newRoot : nullptr);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 //
@@ -1475,6 +1487,7 @@ void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
         copy->filter = this->filter->clone();
 
     copy->sortSet = this->sortSet;
+    copy->physicalProps = this->physicalProps;
 }
 
 std::unique_ptr<QuerySolutionNode> ProjectionNodeDefault::clone() const {
@@ -1916,6 +1929,7 @@ std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
                                             doingMerge,
                                             willBeMerged,
                                             shouldProduceBson);
+    copy->physicalProps = physicalProps;
     return copy;
 }
 
@@ -1937,6 +1951,7 @@ void StreamingGroupNode::appendSpecificToString(str::stream* ss, int indent) con
 std::unique_ptr<QuerySolutionNode> StreamingGroupNode::clone() const {
     auto copy = std::make_unique<StreamingGroupNode>(
         children[0]->clone(), groupByExpression, accumulators, shouldProduceBson, streamingKey);
+    copy->physicalProps = physicalProps;
     return copy;
 }
 
@@ -1991,32 +2006,38 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
         childrenClone.emplace_back(child->clone());
     }
     if (unwindSpec) {
-        return std::make_unique<EqLookupNode>(std::move(childrenClone),
-                                              foreignCollection,
-                                              joinFieldLocal,
-                                              joinFieldForeign,
-                                              joinField,
-                                              lookupStrategy,
-                                              shouldProduceBson,
-                                              unwindSpec->preserveNullAndEmptyArrays,
-                                              unwindSpec->indexPath,
-                                              collationCompatibleForDilj);
+        auto copy = std::make_unique<EqLookupNode>(std::move(childrenClone),
+                                                   foreignCollection,
+                                                   joinFieldLocal,
+                                                   joinFieldForeign,
+                                                   joinField,
+                                                   lookupStrategy,
+                                                   shouldProduceBson,
+                                                   unwindSpec->preserveNullAndEmptyArrays,
+                                                   unwindSpec->indexPath,
+                                                   collationCompatibleForDilj);
+        copy->physicalProps = physicalProps;
+        return copy;
     }
-    return std::make_unique<EqLookupNode>(std::move(childrenClone),
-                                          foreignCollection,
-                                          joinFieldLocal,
-                                          joinFieldForeign,
-                                          joinField,
-                                          lookupStrategy,
-                                          shouldProduceBson,
-                                          collationCompatibleForDilj);
+    auto copy = std::make_unique<EqLookupNode>(std::move(childrenClone),
+                                               foreignCollection,
+                                               joinFieldLocal,
+                                               joinFieldForeign,
+                                               joinField,
+                                               lookupStrategy,
+                                               shouldProduceBson,
+                                               collationCompatibleForDilj);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 /**
  * SentinelNode.
  */
 std::unique_ptr<QuerySolutionNode> SentinelNode::clone() const {
-    return std::make_unique<SentinelNode>();
+    auto copy = std::make_unique<SentinelNode>();
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 void SentinelNode::appendToString(str::stream* ss, int indent) const {
@@ -2029,8 +2050,10 @@ void SentinelNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> SearchNode::clone() const {
-    return std::make_unique<SearchNode>(
+    auto copy = std::make_unique<SearchNode>(
         nss, isSearchMeta, searchQuery, limit, sortSpec, remoteCursorId, remoteCursorVars);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 void SearchNode::appendToString(str::stream* ss, int indent) const {
@@ -2092,11 +2115,34 @@ void HashJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> HashJoinEmbeddingNode::clone() const {
-    return std::make_unique<HashJoinEmbeddingNode>(children[0]->clone(),
-                                                   children[1]->clone(),
-                                                   joinPredicates,
-                                                   leftEmbeddingField,
-                                                   rightEmbeddingField);
+    auto copy = std::make_unique<HashJoinEmbeddingNode>(children[0]->clone(),
+                                                        children[1]->clone(),
+                                                        joinPredicates,
+                                                        leftEmbeddingField,
+                                                        rightEmbeddingField);
+    copy->physicalProps = physicalProps;
+    return copy;
+}
+
+ExchangeNode::ExchangeNode(const ExchangeNode& other) : routing(other.routing) {
+    other.cloneBaseData(this);
+}
+
+void ExchangeNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "EXCHANGE\n";
+    addIndent(ss, indent + 1);
+    *ss << "routing = " << mongo::toString(routing) << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "distribution = " << mongo::toString(physicalProps.distribution) << '\n';
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+std::unique_ptr<QuerySolutionNode> ExchangeNode::clone() const {
+    return std::make_unique<ExchangeNode>(*this);
 }
 
 void NestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
@@ -2106,11 +2152,13 @@ void NestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) co
 }
 
 std::unique_ptr<QuerySolutionNode> NestedLoopJoinEmbeddingNode::clone() const {
-    return std::make_unique<NestedLoopJoinEmbeddingNode>(children[0]->clone(),
-                                                         children[1]->clone(),
-                                                         joinPredicates,
-                                                         leftEmbeddingField,
-                                                         rightEmbeddingField);
+    auto copy = std::make_unique<NestedLoopJoinEmbeddingNode>(children[0]->clone(),
+                                                              children[1]->clone(),
+                                                              joinPredicates,
+                                                              leftEmbeddingField,
+                                                              rightEmbeddingField);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 IndexedNestedLoopJoinEmbeddingNode::IndexedNestedLoopJoinEmbeddingNode(
@@ -2146,6 +2194,7 @@ std::unique_ptr<QuerySolutionNode> IndexedNestedLoopJoinEmbeddingNode::clone() c
                                                                           probePredicates,
                                                                           leftEmbeddingField,
                                                                           rightEmbeddingField);
+    cloneNode->physicalProps = physicalProps;
     return cloneNode;
 }
 
@@ -2160,7 +2209,9 @@ void IndexProbeNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> IndexProbeNode::clone() const {
-    return std::make_unique<IndexProbeNode>(nss, index);
+    auto copy = std::make_unique<IndexProbeNode>(nss, index);
+    copy->physicalProps = physicalProps;
+    return copy;
 }
 
 }  // namespace mongo

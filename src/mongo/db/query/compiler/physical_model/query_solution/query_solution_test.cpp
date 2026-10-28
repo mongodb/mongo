@@ -2722,6 +2722,69 @@ TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput
         solution.summaryString());
 }
 
+void assertCloneKeepsPhysicalProps(std::unique_ptr<QuerySolutionNode> node) {
+    const auto distribution = DistributionDesc::hashOn({FieldPath("x")});
+    node->physicalProps.distribution = distribution;
+    ASSERT_EQ(node->clone()->physicalProps.distribution, distribution)
+        << "clone() of " << nodeStageTypeToString(node.get()) << " lost its physicalProps";
+}
+
+TEST(QuerySolutionTest, CloneKeepsPhysicalPropsOfExistingNodeTypes) {
+    // physicalProps lives on the base node, so every node type has to preserve it, not just the
+    // parallelism planner's own. Node types build their clones in different ways -- through
+    // cloneBaseData(), through a copy constructor, or through a plain constructor -- so each way
+    // needs coverage.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.dummy");
+    auto scan = [] {
+        return std::make_unique<CollectionScanNode>();
+    };
+    auto indexEntry = buildSimpleIndexEntry(BSON("a" << 1));
+    auto predicates = [] {
+        return std::vector<QSNJoinPredicate>{
+            QSNJoinPredicate{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("a"), FieldPath("b")}};
+    };
+
+    // Through cloneBaseData(), including the QuerySolutionNodeWithSortSet overload.
+    assertCloneKeepsPhysicalProps(scan());
+    assertCloneKeepsPhysicalProps(std::make_unique<IndexScanNode>(nss, indexEntry));
+
+    // Through a copy constructor.
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<LimitNode>(scan(), 1, LimitSkipParameterization::Disabled));
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<SkipNode>(scan(), 1, LimitSkipParameterization::Disabled));
+    assertCloneKeepsPhysicalProps(std::make_unique<SortNodeDefault>(
+        scan(), BSON("a" << 1), 0, LimitSkipParameterization::Disabled, 1024));
+
+    // Through a plain constructor.
+    assertCloneKeepsPhysicalProps(std::make_unique<SentinelNode>());
+    assertCloneKeepsPhysicalProps(std::make_unique<IndexProbeNode>(nss, indexEntry));
+    assertCloneKeepsPhysicalProps(std::make_unique<UnwindNode>(
+        scan(), UnwindNode::UnwindSpec{FieldPath("a"), true, boost::none}));
+    assertCloneKeepsPhysicalProps(std::make_unique<HashJoinEmbeddingNode>(
+        scan(), scan(), predicates(), boost::none, boost::none));
+    assertCloneKeepsPhysicalProps(std::make_unique<NestedLoopJoinEmbeddingNode>(
+        scan(), scan(), predicates(), boost::none, boost::none));
+    assertCloneKeepsPhysicalProps(std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
+        scan(),
+        std::make_unique<IndexProbeNode>(nss, indexEntry),
+        predicates(),
+        std::vector<QSNJoinPredicate>{},
+        boost::none,
+        boost::none));
+
+    // Nodes that hold a match expression or projection.
+    auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<ProjectionNodeDefault>(scan(), filter.get(), projection));
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<ProjectionNodeSimple>(scan(), filter.get(), projection));
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<ProjectionNodeCovered>(scan(), filter.get(), projection, BSON("a" << 1)));
+    assertCloneKeepsPhysicalProps(std::make_unique<MatchNode>(scan(), std::move(filter)));
+    assertCloneKeepsPhysicalProps(std::make_unique<ShardingFilterNode>());
+}
+
 TEST(QuerySolutionTest, ParallelEligibleNodes) {
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto scan = [] {
@@ -2745,6 +2808,35 @@ TEST(QuerySolutionTest, ParallelEligibleNodes) {
         std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     ASSERT_FALSE(indexScan->isParallelEligible());
     ASSERT_FALSE(FetchNode(std::move(indexScan), mainNss).isParallelEligible());
+}
+
+TEST(QuerySolutionTest, GroupNodeCloneKeepsPhysicalProps) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    assertCloneKeepsPhysicalProps(makeGroupNodeForToStringTest(
+        expCtx.get(),
+        Expression::parseObject(expCtx.get(), BSON("a" << "$a"), expCtx->variablesParseState)));
+}
+
+TEST(QuerySolutionTest, StreamingGroupNodeCloneKeepsPhysicalProps) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        Expression::parseObject(expCtx.get(), BSON("a" << "$a"), expCtx->variablesParseState);
+    assertCloneKeepsPhysicalProps(
+        std::make_unique<StreamingGroupNode>(std::make_unique<CollectionScanNode>(),
+                                             groupByExpression,
+                                             std::vector<AccumulationStatement>{},
+                                             /*shouldProduceBson=*/false,
+                                             std::vector<FieldPath>{FieldPath("a")}));
 }
 
 }  // namespace
