@@ -126,3 +126,6 @@ filters:
   - "log.js":
     approvers:
       - 10gen/query-integration-observability
+  - "retryable_writes_util.js":
+    approvers:
+      - 10gen/server-transactions
