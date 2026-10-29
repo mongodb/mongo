@@ -264,8 +264,10 @@ void _logInvalidIndexes(OperationContext* opCtx,
                         ValidateState& validateState,
                         ValidateResults& results) {
     if (validateState.isFullIndexValidation()) {
-        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-            validateState.nss(), MODE_X));
+        uassert(13680100,
+                "Full index validation requires the collection lock",
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    validateState.nss(), validateState.collectionLockMode()));
     }
     for (auto& [indexName, ivr] : results.getIndexResultsMap()) {
         if (!ivr.isValid()) {
@@ -1225,9 +1227,11 @@ Status validate(OperationContext* opCtx,
     results.setReadTimestamp(validateState.getReadTimestamp());
 
     try {
-        invariant(!validateState.isFullIndexValidation() ||
-                  shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-                      validateState.nss(), MODE_X));
+        uassert(13680101,
+                "Full index validation requires the collection lock",
+                !validateState.isFullIndexValidation() ||
+                    shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                        validateState.nss(), validateState.collectionLockMode()));
 
         // Report the interpreted options before starting validation.
         LOGV2_OPTIONS(20303,

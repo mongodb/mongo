@@ -853,6 +853,49 @@ TEST_P(CollectionValidationAdaptorTest, ValidateEnforceFastCountMismatchDoesNotS
     ASSERT_EQ(numRecords, indexResults.at("_id_").getKeysTraversed());
 }
 
+TEST_P(CollectionValidationAdaptorTest, ValidateWithoutRepairDoesNotUpdateFastCount) {
+    auto opCtx = operationContext();
+    const int numRecords = insertDataRange(opCtx, 0, 5);
+
+    const int64_t skewedFastCount = numRecords + 2;
+    {
+        const AutoGetCollection coll(opCtx, kNss, MODE_X);
+        coll->getRecordStore()->updateStatsAfterRepair(skewedFastCount, /*dataSize=*/64);
+    }
+
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true, .numRecords = numRecords},
+                       {collection_validation::ValidateMode::kForegroundFull},
+                       collection_validation::RepairMode::kNone,
+                       currentValidationVersion,
+                       sliceTarget());
+
+    const AutoGetCollection coll(opCtx, kNss, MODE_IS);
+    ASSERT_EQ(skewedFastCount, coll->latestSizeCount(opCtx).count);
+}
+
+TEST_P(CollectionValidationAdaptorTest, ValidateWithRepairUpdatesFastCount) {
+    auto opCtx = operationContext();
+    const int numRecords = insertDataRange(opCtx, 0, 5);
+
+    {
+        const AutoGetCollection coll(opCtx, kNss, MODE_X);
+        coll->getRecordStore()->updateStatsAfterRepair(numRecords + 2, /*dataSize=*/64);
+    }
+
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true, .numRecords = numRecords},
+                       {collection_validation::ValidateMode::kForegroundFull},
+                       collection_validation::RepairMode::kFixErrors,
+                       currentValidationVersion,
+                       sliceTarget());
+
+    const AutoGetCollection coll(opCtx, kNss, MODE_IS);
+    ASSERT_EQ(numRecords, coll->latestSizeCount(opCtx).count);
+}
+
 TEST_P(CollectionValidationAdaptorTest, ValidateCollectionDocumentSizeUserLimit) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,

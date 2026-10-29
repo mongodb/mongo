@@ -91,7 +91,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
       _validateLock(isBackground() ? boost::none
                                    : boost::optional<Lock::SharedLock>{{opCtx, validateLock}}),
       _globalLock(opCtx,
-                  isBackground() ? MODE_IS : MODE_IX,
+                  collectionLockMode() == MODE_X ? MODE_IX : MODE_IS,
                   {false,
                    false,
                    false,
@@ -298,7 +298,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
                 !isBackground() && getRepairMode() != RepairMode::kNone
                     ? AcquisitionPrerequisites::OperationType::kUnreplicatedWrite
                     : AcquisitionPrerequisites::OperationType::kRead),
-            isBackground() ? LockMode::MODE_IS : LockMode::MODE_X);
+            collectionLockMode());
         if (wasRenamed) {
             _nss = acquisition.nss();
         }
@@ -338,8 +338,8 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         _dataThrottle.turnThrottlingOff();
     }
 
-    // We can release the validate lock here as we now have exclusive access to the collection and
-    // no CRUD operations or fast count changes will occur.
+    // We can release the validate lock here as our collection lock blocks writers, so no CRUD
+    // operations or fast count changes will occur.
     _validateLock.reset();
     return Status::OK();
 }

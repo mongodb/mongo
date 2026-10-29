@@ -4,8 +4,10 @@
 #include "mongo/db/validate/validate_state.h"
 
 #include "mongo/db/repl/local_oplog_info.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/ident.h"
@@ -49,6 +51,53 @@ void createReplicatedFastCountContainers(OperationContext* opCtx) {
                                                 ident::kFastCountMetadataStoreTimestamps,
                                                 KeyFormat::Long,
                                                 /*writeToOplog=*/false));
+}
+
+
+class ValidateStateLockTest : public CatalogTestFixture {
+public:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
+    }
+
+    ValidationOptions makeOptions(ValidateMode mode, RepairMode repairMode) {
+        return ValidationOptions(mode, repairMode, /*logDiagnostics=*/false);
+    }
+};
+
+TEST_F(ValidateStateLockTest, ForegroundWithoutFullValidationTakesSharedCollectionLock) {
+    ValidateState validateState(
+        operationContext(), kNss, makeOptions(ValidateMode::kForeground, RepairMode::kNone));
+    ASSERT_OK(validateState.initializeCollection(operationContext()));
+
+    auto* locker = shard_role_details::getLocker(operationContext());
+    EXPECT_TRUE(locker->isCollectionLockedForMode(kNss, MODE_S));
+    EXPECT_FALSE(locker->isCollectionLockedForMode(kNss, MODE_X));
+    EXPECT_FALSE(locker->isWriteLocked());
+}
+
+TEST_F(ValidateStateLockTest, ForegroundFullValidationTakesExclusiveCollectionLock) {
+    for (auto mode : {ValidateMode::kForegroundFull, ValidateMode::kForegroundFullIndexOnly}) {
+        ValidateState validateState(operationContext(), kNss, makeOptions(mode, RepairMode::kNone));
+        ASSERT_OK(validateState.initializeCollection(operationContext()));
+
+        auto* locker = shard_role_details::getLocker(operationContext());
+        EXPECT_TRUE(locker->isCollectionLockedForMode(kNss, MODE_X));
+    }
+}
+
+TEST_F(ValidateStateLockTest, ForegroundWithRepairTakesExclusiveCollectionLock) {
+    for (auto repairMode : {RepairMode::kFixErrors, RepairMode::kAdjustMultikey}) {
+        ValidateState validateState(
+            operationContext(), kNss, makeOptions(ValidateMode::kForegroundFull, repairMode));
+        ASSERT_OK(validateState.initializeCollection(operationContext()));
+
+        auto* locker = shard_role_details::getLocker(operationContext());
+        EXPECT_TRUE(locker->isCollectionLockedForMode(kNss, MODE_X));
+        EXPECT_TRUE(locker->isWriteLocked());
+    }
 }
 
 }  // namespace
@@ -208,8 +257,12 @@ TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
         createReplicatedFastCountContainers(operationContext());
     }
 
-    ValidateState validateState(operationContext(), kNss, kValidationOptions);
-    FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
+    // Validate state will hold the lock that prevents enforcing fast count. It must go out of
+    // scope before running the test cases.
+    const FastCountType fastCountType = [&] {
+        ValidateState validateState(operationContext(), kNss, kValidationOptions);
+        return validateState.getDetectedFastCountType(operationContext());
+    }();
     EXPECT_EQ(fastCountType, p.expectedFastCountType);
 
     runShouldEnforceTestCases(operationContext(), p.testCases, fastCountType);

@@ -691,9 +691,9 @@ void ValidateAdaptor::postTraverseRecordStoreImpl(OperationContext* opCtx,
         opCtx, *_validateState, *coll.get(), _numRecords, dataSizeTotal, validateResults);
 
     // TODO(SERVER-119193): Add condition for the fastCountType being valid.
-    // Do not update the record store stats if we're in the background as we've validated a
-    // checkpoint and it may not have the most up-to-date changes.
-    if (validateResults.isValid() && !_validateState->isBackground()) {
+    // Only update the record store stats when repairing. Background validation reads a checkpoint
+    // that may not have the most up-to-date changes.
+    if (validateResults.isValid() && _validateState->fixErrors()) {
         coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
 }
